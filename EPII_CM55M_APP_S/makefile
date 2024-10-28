@@ -148,8 +148,10 @@ CUSTOMER ?= seeed
 # ei_standalone_inferencing_camera
 # edge_impulse_firmware
 # tflm_peoplenet
+# hello_world
+# incr_learn
 ##
-APP_TYPE = allon_sensor_tflm
+APP_TYPE = incr_learn
  
 ### Options above must be added before include options.mk ###
 override EPII_ROOT := $(strip $(subst \,/,$(EPII_ROOT)))

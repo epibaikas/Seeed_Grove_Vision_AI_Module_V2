@@ -216,6 +216,18 @@ int main(void)
 }
 #endif
 
+#ifdef HELLO_WORLD
+#include "hello_world.h"
+
+/** main entry */
+int main(void)
+{
+	board_init();
+	app_main();
+	return 0;
+}
+#endif
+
 #ifdef EI_STANDALONE_INFERENCING
 #include "ei_standalone_inferencing.h"
 
@@ -235,7 +247,17 @@ int main(void)
 {
 	board_init();
 	ei_standalone_inferencing_app();
+}
+#endif
 
+#ifdef INCR_LEARN
+#include "incr_learn.h"
+
+/** main entry */
+int main(void)
+{
+	board_init();
+	app_main();
 	return 0;
 }
 #endif
@@ -285,3 +307,47 @@ int main(void)
 }
 #endif
 
+#ifdef EDGE_IMPULSE_FIRMWARE
+#include "edge_impulse_firmware.h"
+
+int main(void)
+{
+	/*set pinmux init*/
+	pinmux_init();
+	/*platform driver init*/
+	platform_driver_init();
+#ifdef IP_uart
+	console_setup(USE_DW_UART_0, UART_BAUDRATE_115200);
+#endif
+#ifdef LIB_COMMON
+	xprintf_setup();
+#endif
+	edge_impulse_app();
+
+	return 0;
+}
+#endif
+
+#ifdef KWS_PDM_RECORD
+#include "kws_pdm_record.h"
+
+/* main entry */
+int main(void)
+{
+	board_init();
+	kws_pdm_record_app();
+	return 0;
+}
+#endif
+
+
+#ifdef TFLM_PEOPLENET
+#include "tflm_peoplenet.h"
+/** main entry */
+int main(void)
+{
+	board_init();
+	tflm_peoplenet_app();
+	return 0;
+}
+#endif
