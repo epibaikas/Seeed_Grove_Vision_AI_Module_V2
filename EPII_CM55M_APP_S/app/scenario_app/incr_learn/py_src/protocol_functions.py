@@ -2,6 +2,7 @@ import serial
 import numpy as np
 
 def send_command(command_name, seq_num, param_list, ser, req_log, resp_log, data_in=None, data_out=None):
+    command_return_value = 0
     req_msg = 'begin {} {} '.format(seq_num, command_name.__name__) + ' '.join(
         [str(param) for param in param_list]) + '\r'
     req_log.write(req_msg)
@@ -18,11 +19,11 @@ def send_command(command_name, seq_num, param_list, ser, req_log, resp_log, data
         return -1
 
     if data_in is not None:
-        command_name(param_list, data_in, ser, req_log, resp_log)
+        command_return_value = command_name(param_list, data_in, ser, req_log, resp_log)
     elif data_out is not None:
-        command_name(param_list, data_out, ser, req_log, resp_log)
+        command_return_value = command_name(param_list, data_out, ser, req_log, resp_log)
     else:
-        command_name(param_list, ser, req_log, resp_log)
+        command_return_value = command_name(param_list, ser, req_log, resp_log)
 
     req_msg = 'end {}\r'.format(seq_num)
     ser.write(req_msg.encode())
@@ -38,7 +39,7 @@ def send_command(command_name, seq_num, param_list, ser, req_log, resp_log, data
     req_log.flush()
     resp_log.flush()
 
-    return 0
+    return command_return_value
 
 
 def write_ram_buffer(param_list, data, ser, req_log, resp_log):
@@ -67,7 +68,7 @@ def write_eeprom(param_list, img, ser, req_log, resp_log):
     if len(param_list) != 2:
         return -1
 
-    flash_addr = param_list[0]
+    example_num = param_list[0]
     num_per_line = param_list[1]
     write_buffer(img, img.shape[0], num_per_line, ser, req_log, resp_log)
     return 0
@@ -77,7 +78,7 @@ def read_eeprom(param_list, data_read_buffer, ser, req_log, resp_log):
     if len(param_list) != 3:
         return -1
 
-    flash_address = param_list[0]
+    example_num = param_list[0]
     num_per_line = param_list[1]
     bytes_per_img = param_list[2]
 
@@ -96,7 +97,7 @@ def read_labels_buffer(param_list, labels_array, ser, req_log, resp_log):
     return 0
 
 
-def compute_dist_matrix(seq_num, ser, req_log, resp_log):
+def compute_dist_matrix(param_list, ser, req_log, resp_log):
     resp_line = ser.readline().decode()
     print(resp_line, end='')
     resp_log.write(resp_line.rstrip() + '\n')
@@ -124,12 +125,6 @@ def rand_subset_selection(param_list, data_out, ser, req_log, resp_log):
         return -1
 
     num_per_line = param_list[0]
-
-    # TODO: Placed loop for debugging, remove after problem is fixed
-    for i in range(data_out[1].shape[0]):
-        resp_line = ser.readline().decode()
-        print(resp_line, end='')
-        resp_log.write(resp_line.rstrip() + '\n')
 
     read_buffer(data_out[0], data_out[0].shape[0], num_per_line, ser, req_log, resp_log)
 
@@ -185,3 +180,18 @@ def read_buffer(array, size, num_per_line, ser, req_log, resp_log):
 
         ser.write(ack_msg.encode())
         req_log.write(ack_msg)
+
+def set_random_seed(param_list, ser, req_log, resp_log):
+    if len(param_list) != 1:
+        return -1
+
+    random_seed = param_list[0]
+
+    resp_line = ser.readline().decode()
+    print(resp_line, end='')
+    resp_log.write(resp_line.rstrip() + '\n')
+
+    if resp_line != f'random seed set to: {random_seed}\r\r\n':
+        return -1
+
+    return 0

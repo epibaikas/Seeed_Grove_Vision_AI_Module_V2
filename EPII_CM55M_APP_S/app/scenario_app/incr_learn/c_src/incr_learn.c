@@ -162,10 +162,6 @@ int app_main(void) {
 	printf("SPI ID info: %u\r\n", id_info);
 	xprintf("Init complete\r\n");
 
-	// Erase the first 4 MB of available flash (first 64 64kB sectors) 
-	for (int i = 0; i < 64; i++)
-		hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, FLASH_BASE_ADDRESS + i*0x10000, FLASH_64KBLOCK);
-
 	// Allocate memory for RAM buffer
 	uint8_t **ram_buffer = (uint8_t **)calloc(NUM_OF_IMGS_IN_RAM_BUFFER, sizeof(uint8_t *));
 	if (ram_buffer == NULL) {
@@ -178,8 +174,6 @@ int app_main(void) {
 		if (ram_buffer[i] == NULL) {
 			xprintf("mem_error: memory allocation for ram_buffer[%d] failed\r\n", i);
 			exit(1);
-		} else {
-			xprintf("Addr of ram_buffer[%d]: 0x%08x\r\n", i, ram_buffer[i]);
 		}
 	}
 
@@ -189,18 +183,24 @@ int app_main(void) {
 	// Create eeprom buffers;
 	static uint8_t eeprom_buffer[BYTES_PER_IMG] = {0};
 	static uint8_t eeprom_buffer_2[BYTES_PER_IMG] = {0};
+	static uint8_t eeprom_sector_buffer[FLASH_SECTOR_SIZE] = {0};
 	static uint8_t labels[NUM_OF_IMGS_TOTAL] = {0};
 
 	struct FunctionArguments fun_args;
 	fun_args.ram_buffer = ram_buffer;
 	fun_args.eeprom_buffer = eeprom_buffer;
 	fun_args.eeprom_buffer_2 = eeprom_buffer_2;
+	fun_args.eeprom_sector_buffer = eeprom_sector_buffer;
 	fun_args.dist_matrix = dist_matrix;
 	fun_args.labels = labels;
+	fun_args.random_seed = 1;
 
 	xprintf("Addr of dist_matrix: 0x%08x\r\n", dist_matrix);
 	xprintf("Addr of eeprom_buffer: 0x%08x\r\n", eeprom_buffer);
 	xprintf("Addr of eeprom_buffer_2: 0x%08x\r\n", eeprom_buffer_2);
+	xprintf("Addr of eeprom_sector_buffer: 0x%08x\r\n", eeprom_sector_buffer);
+	xprintf("Addr of labels buffer: 0x%08x\r\n", labels);
+	xprintf("RAND_MAX: 0x%08x\r\n", RAND_MAX);
 
 	xprintf("Memory allocation complete\r\n");
 	//-----------------------------------------------------
@@ -260,82 +260,4 @@ int app_main(void) {
 	};
 
 	return 0;
-
-	// Initialize eeprom
-	// printf("Init EEPROM...\r\n");
-	// uint8_t id_info = 2;
-	// hx_lib_spi_eeprom_open(USE_DW_SPI_MST_Q);
-	// hx_lib_spi_eeprom_read_ID(USE_DW_SPI_MST_Q, &id_info);
-	// printf("SPI ID info: %u\r\n", id_info);
-
-	// #define FLASH_ADDRESS 0x00200000
-	// #define NUM_OF_ELEMENTS 8
-
-	// Erase flash sector 
-	// hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, FLASH_ADDRESS, FLASH_SECTOR);
-
-	// uint8_t tx_buf[NUM_OF_ELEMENTS] = {0xAB, 0xCD, 0xEF, 0xAF};
-	// hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, FLASH_ADDRESS, &tx_buf[0], NUM_OF_ELEMENTS, 0);
-	// uint8_t rx_buf[NUM_OF_ELEMENTS] = {0, 0, 0, 0};
-	// hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, FLASH_ADDRESS, &rx_buf[0], NUM_OF_ELEMENTS);
-
-	// unsigned int i = 0;
-	// for (i = 0; i < NUM_OF_ELEMENTS; i++) {
-	// 	printf("i = %u, rx_buf[i]=%x\r\n", i, rx_buf[i]);
-	// }
-
-	// printf("Read existing EEPROM data...\r\n");
-	// uint8_t eeprom_rbuffer[NUM_OF_ELEMENTS];
-	// hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, FLASH_ADDRESS, &eeprom_rbuffer[0], NUM_OF_ELEMENTS);
-
-	// unsigned int i = 0;
-	// for (i = 0; i < NUM_OF_ELEMENTS; i++) {
-	// 	printf("i = %u, eeprom_rbuffer[i] = 0x%02x\r\n", i, eeprom_rbuffer[i]);
-	// }
-
-	// // Erase flash sector 
-	// hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, FLASH_ADDRESS, FLASH_SECTOR);
-
-
-	// xprintf("Init UART...\r\n");
-	// // Initialize UART 0
-	// hx_drv_uart_init(USE_DW_UART_0, HX_UART0_BASE);
-
-	// #define UART_RBUFFER_LEN 8
-	// uint32_t uart_rbuffer_len = UART_RBUFFER_LEN;
-	// uint8_t uart_rbuffer[UART_RBUFFER_LEN];
-	// DEV_UART_PTR dev_uart_ptr;
-
-	// memset(&uart_rbuffer[0], 0x00, uart_rbuffer_len);
-	// dev_uart_ptr = hx_drv_uart_get_dev(USE_DW_UART_0);
-	// dev_uart_ptr->uart_open(UART_BAUDRATE_921600);
-
-
-	// printf("Waiting for data...\r\n");
-	// int32_t e_no = dev_uart_ptr->uart_read(uart_rbuffer, uart_rbuffer_len);
-	// printf("READ data (string format): %s\r\n", uart_rbuffer);
-	// hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, FLASH_ADDRESS, &uart_rbuffer[0], uart_rbuffer_len, 0);
-	// printf("Data transfer complete!\r\n");
-
-	// hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, FLASH_ADDRESS, &eeprom_rbuffer[0], uart_rbuffer_len);
-	// for (i = 0; i < NUM_OF_ELEMENTS; i++) {
-	// 	printf("i = %u, eeprom_rbuffer[i] = 0x%02x\r\n", i, eeprom_rbuffer[i]);
-	// 	// printf("i = %u, eeprom_rbuffer[i]=%c\r\n", i, eeprom_rbuffer[i]);
-	// }
-
-	// for (i = 0; i < NUM_OF_ELEMENTS; i++) {
-	// 	printf("i = %u, uart_rbuffer[i] = 0x%02x\r\n", i, eeprom_rbuffer[i]);
-	// 	// printf("i = %u, eeprom_rbuffer[i]=%c\r\n", i, eeprom_rbuffer[i]);
-	// }
-	
-	// do {
-	// 	printf("Waiting for next data buffer...");
-	// 	e_no = dev_uart_ptr->uart_read(uart_rbuffer, uart_rbuffer_len);
-	// } while ((uart_rbuffer[0] != 0xFF));
-
-	// printf("Next data buffer received");
-
-	// printf("Init UART...\r\n");
-	// Initialize UART 0
-	// hx_drv_uart_init(USE_DW_UART_0, HX_UART0_BASE);
 }

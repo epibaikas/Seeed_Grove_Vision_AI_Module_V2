@@ -1,3 +1,8 @@
+#ifndef UTIL_FUNCTIONS_H
+#define UTIL_FUNCTIONS_H
+
+struct FunctionArguments;
+
 uint16_t* allocate_symmetric_2D_array(uint32_t N);
 void set_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, int32_t j, uint16_t value);
 uint16_t get_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, uint32_t j);
@@ -11,3 +16,10 @@ void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs);
 int compare_indices(void *arr, const void *a, const void *b);
 uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k);
 uint8_t find_max_index(uint8_t *array, size_t size);
+
+void get_example_flash_addr(int example_num, int* flash_sector_num, uint32_t* flash_sector_start_addr, int* flash_sector_idx);
+
+void write_buffer(uint8_t* buffer, uint32_t buffer_size, int num_per_line);
+void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size,  int num_per_line);
+void update_labels_buffer(struct FunctionArguments *fun_args);
+#endif

@@ -2,9 +2,9 @@ import serial
 import numpy as np
 import os
 
-from protocol_functions import *
-from util_functions import *
-from data_utils import load_dataset, get_class_example_indices, get_random_balanced_subset_indices
+from py_src.protocol_functions import *
+from py_src.util_functions import *
+from py_src.data_utils import load_dataset, get_class_example_indices, get_random_balanced_subset_indices
 
 port = '/dev/cu.usbmodem578D0263771'
 baudrate = 921600
@@ -21,7 +21,7 @@ num_per_line = 28
 random_seed = 42
 np.random.seed(random_seed)
 
-dataset_name = ('FashionMNIST')
+dataset_name = 'FashionMNIST'
 device = 'cpu'
 train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, device)
 
@@ -47,7 +47,7 @@ ser = serial.Serial(port, baudrate, timeout=None)
 
 # Wait for the initialization stage on the board to be completed
 memory_alloc_complete = False
-while (not memory_alloc_complete):
+while not memory_alloc_complete:
     line = ser.readline().decode()  # read a '\n' terminated line and convert it to string
     if line == 'Memory allocation complete\r\r\n':
         print(line, end='')
@@ -63,6 +63,14 @@ if not os.path.exists(log_dir_path):
 # Open log files
 req_log = open(os.path.join(log_dir_path, 'test_requests_log.txt'), 'w')
 resp_log = open(os.path.join(log_dir_path, 'test_responses_log.txt'), 'w')
+
+
+def test_set_random_seed():
+    global seq_num
+    command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed],
+                                        ser=ser, req_log=req_log, resp_log=resp_log)
+    seq_num += 1
+    assert command_return_value == 0
 
 
 def test_write_read_ram_buffer():
@@ -81,11 +89,11 @@ def test_write_read_eeprom_buffer():
     global seq_num
     for i in range(N_RAM_BUFFER, N_TOTAL):
         send_command(write_eeprom, seq_num=seq_num,
-                     param_list=[hex(base_flash_addr + (i - N_RAM_BUFFER) * bytes_per_img), num_per_line],
+                     param_list=[(i - N_RAM_BUFFER), num_per_line],
                      ser=ser, req_log=req_log, resp_log=resp_log, data_in=img_data[i])
         seq_num += 1
         send_command(read_eeprom, seq_num=seq_num,
-                     param_list=[hex(base_flash_addr + (i - N_RAM_BUFFER) * bytes_per_img), num_per_line,
+                     param_list=[(i - N_RAM_BUFFER), num_per_line,
                                  bytes_per_img], ser=ser, req_log=req_log, resp_log=resp_log,
                      data_out=data_read_buffer)
         seq_num += 1
@@ -125,5 +133,6 @@ def test_rand_subset_selection():
     seq_num += 1
 
     # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = predict_labels(img_data[:, data_bytes_per_img], expected_dist_matrix, subset_idxs, k_kNN=3)
+    expected_predicted_labels = predict_labels(img_data[:, data_bytes_per_img],
+                                               expected_dist_matrix, subset_idxs, k_kNN=3)
     assert np.array_equal(expected_predicted_labels, predicted_labels)

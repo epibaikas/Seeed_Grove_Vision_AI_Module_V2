@@ -72,9 +72,9 @@ with serial.Serial(port, baudrate, timeout=None) as ser:
             assert np.array_equal(img_data[i], data_read_buffer)
 
         else:
-            send_command(write_eeprom, seq_num=seq_num, param_list=[hex(base_flash_addr + (i - N_RAM_BUFFER) * bytes_per_img), num_per_line], ser=ser, req_log=req_log, resp_log=resp_log, data_in=img_data[i])
+            send_command(write_eeprom, seq_num=seq_num, param_list=[(i - N_RAM_BUFFER), num_per_line], ser=ser, req_log=req_log, resp_log=resp_log, data_in=img_data[i])
             seq_num += 1
-            send_command(read_eeprom, seq_num=seq_num, param_list=[hex(base_flash_addr + (i - N_RAM_BUFFER) * bytes_per_img), num_per_line, bytes_per_img], ser=ser, req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
+            send_command(read_eeprom, seq_num=seq_num, param_list=[(i - N_RAM_BUFFER), num_per_line, bytes_per_img], ser=ser, req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
             seq_num += 1
             assert np.array_equal(img_data[i], data_read_buffer)
 
