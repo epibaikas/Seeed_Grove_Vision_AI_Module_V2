@@ -33,9 +33,25 @@
 # Various build files
 EPII_CM55M_APP_S/obj_*/**
 we2_image_gen_local/output_*/**
+model_zoo/
 we2_image_gen_local/Images*.txt
 *.elf
 *.map
 *.img
+
+# App files
+.DS_Store
+EPII_CM55M_APP_S/.DS_Store
+EPII_CM55M_APP_S/app/.DS_Store
+EPII_CM55M_APP_S/app/scenario_app/.DS_Store
+EPII_CM55M_APP_S/app/scenario_app/hello_world/
+EPII_CM55M_APP_S/app/scenario_app/ei_standalone_inferencing_cmsis/
+EPII_CM55M_APP_S/app/scenario_app/ei_standalone_inferencing_ethos/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/.idea/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/__pycache__/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/datasets/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/log/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/py_src/__pycache__/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/tests/__pycache__/
 
 .vscode/
