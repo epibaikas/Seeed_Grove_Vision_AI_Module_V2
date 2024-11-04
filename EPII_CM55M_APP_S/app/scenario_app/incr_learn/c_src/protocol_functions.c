@@ -274,6 +274,9 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
         predicted_labels[i] = predict_label(indices, fun_args->labels, kNN_k);
     }
 
+    // Move subset data examples located in RAM to EEPROM
+    move_subset_to_eeprom(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, fun_args);
+
     // Output generated subset and label predictions
     read_buffer(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), num_per_line);
     xprintf("subset_idxs_read_done\r\n");

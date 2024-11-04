@@ -110,6 +110,11 @@ void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs) {
     free(idx_array);
 }
 
+// Comparator function for sorting subset indices in ascending order
+int compare_subset_indices(const void *a, const void *b) {
+    return (*(uint16_t*)a - *(uint16_t*)b);
+}
+
 // Comparator function for stable argsort
 int compare_indices(void *arr, const void *a, const void *b) {
     uint16_t *array = (uint16_t *)arr;
@@ -250,4 +255,64 @@ void update_labels_buffer(struct FunctionArguments *fun_args) {
             fun_args->labels[i] = fun_args->eeprom_buffer[0];
         }
     }
+}
+
+void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args) {
+    // Sort subset_idxs in ascending order
+    qsort(subset_idxs, subset_size, sizeof(uint16_t), compare_subset_indices);
+
+    // Get the indices of examples in eeprom that will be replaced by examples in RAM
+    // Find the index of the first eeprom data example in sorted subset_idxs
+    int first_eeprom_idx = 0;
+    while (subset_idxs[first_eeprom_idx] < NUM_OF_IMGS_IN_RAM_BUFFER && first_eeprom_idx < subset_size) {
+        first_eeprom_idx++;
+    }
+
+    // Find eeprom indices where data from RAM buffer will be placed.
+    // These are the indices of eeprom exampels that are not in the subset
+    uint16_t* eeprom_indices_not_in_subset  = calloc(first_eeprom_idx, sizeof(uint16_t));
+    if (eeprom_indices_not_in_subset == NULL) {
+        xprintf("mem_error: memory allocation for eeprom_indices_not_in_subset failed");
+        exit(1);
+    }
+
+    int i = 0;
+    int j = first_eeprom_idx;
+    for (uint16_t idx = NUM_OF_IMGS_IN_RAM_BUFFER; idx < NUM_OF_IMGS_TOTAL; idx++) {
+        if (idx == subset_idxs[j]) {
+            j++;
+        } else {
+            // The index does not belong to the subset
+            // Add it to eeprom_indices_not_in_subset
+            eeprom_indices_not_in_subset[i] = idx;
+            i++;
+        }
+    }
+
+    int example_num = 0;
+    int flash_sector_num = 0;
+    uint32_t flash_sector_start_addr = FLASH_BASE_ADDRESS;
+    int flash_sector_idx = 0;
+
+    // Replace EEPROM examples that are not in the subset with examples from RAM
+    for (int i = 0; i < first_eeprom_idx; i++) {
+        example_num = eeprom_indices_not_in_subset[i] - NUM_OF_IMGS_IN_RAM_BUFFER; // Subtract NUM_OF_IMGS_IN_RAM_BUFFER to change index range to [0, NUM_OF_IMGS_IN_EEPROM - 1]
+
+        // Determine flash_sector_num based on example_num
+        get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
+
+        // Read contents from flash sector to eeprom_sector_buffer 
+        hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), FLASH_SECTOR_SIZE);
+
+        // Erase flash sector
+        hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, flash_sector_start_addr, FLASH_SECTOR);
+
+        // Copy the contents of ram_buffer[subset_idxs[i]] to eeprom_sector_buffer
+        memcpy(&(fun_args->eeprom_sector_buffer[flash_sector_idx]),  fun_args->ram_buffer[subset_idxs[i]], BYTES_PER_IMG);
+
+        // Write data in eeprom_sector_buffer to flash
+        hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), FLASH_SECTOR_SIZE, 0);
+    }
+
+    free(eeprom_indices_not_in_subset);
 }

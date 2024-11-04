@@ -2,9 +2,9 @@ import serial
 import numpy as np
 import os
 
-from py_src.protocol_functions import *
-from py_src.util_functions import *
-from py_src.data_utils import load_dataset, get_class_example_indices, get_random_balanced_subset_indices
+from protocol_functions import *
+from util_functions import *
+from data_utils import load_dataset, get_class_example_indices, get_random_balanced_subset_indices
 
 port = '/dev/cu.usbmodem578D0263771'
 baudrate = 921600
@@ -88,14 +88,11 @@ def test_write_read_ram_buffer():
 def test_write_read_eeprom_buffer():
     global seq_num
     for i in range(N_RAM_BUFFER, N_TOTAL):
-        send_command(write_eeprom, seq_num=seq_num,
-                     param_list=[(i - N_RAM_BUFFER), num_per_line],
+        send_command(write_eeprom, seq_num=seq_num, param_list=[(i - N_RAM_BUFFER), num_per_line],
                      ser=ser, req_log=req_log, resp_log=resp_log, data_in=img_data[i])
         seq_num += 1
-        send_command(read_eeprom, seq_num=seq_num,
-                     param_list=[(i - N_RAM_BUFFER), num_per_line,
-                                 bytes_per_img], ser=ser, req_log=req_log, resp_log=resp_log,
-                     data_out=data_read_buffer)
+        send_command(read_eeprom, seq_num=seq_num, param_list=[(i - N_RAM_BUFFER), num_per_line, bytes_per_img],
+                     ser=ser, req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
         seq_num += 1
         assert np.array_equal(img_data[i], data_read_buffer)
 
@@ -135,4 +132,22 @@ def test_rand_subset_selection():
     # Check if predicted labels match the expected predicted labels
     expected_predicted_labels = predict_labels(img_data[:, data_bytes_per_img],
                                                expected_dist_matrix, subset_idxs, k_kNN=3)
+
+    # Check if RAM subset data have been transferred correctly to EEPROM
+    eeprom_idxs_set = set(range(N_RAM_BUFFER, N_TOTAL))
+    subset_idxs_set = set(subset_idxs)
+
+    eeprom_idxs_to_be_overwritten = list(eeprom_idxs_set - subset_idxs_set)
+    eeprom_idxs_to_be_overwritten.sort()
+
+    ram_subset_idxs = list(subset_idxs_set - eeprom_idxs_set)
+    ram_subset_idxs.sort()
+
+    for i, eeprom_idx in enumerate(eeprom_idxs_to_be_overwritten):
+        send_command(read_eeprom, seq_num=seq_num, param_list=[(eeprom_idx - N_RAM_BUFFER), num_per_line, bytes_per_img],
+                     ser=ser, req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
+        seq_num += 1
+        assert np.array_equal(img_data[ram_subset_idxs[i]], data_read_buffer)
+
+
     assert np.array_equal(expected_predicted_labels, predicted_labels)
