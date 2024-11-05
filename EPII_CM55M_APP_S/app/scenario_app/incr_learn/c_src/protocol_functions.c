@@ -270,18 +270,18 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
             indices[j] = subset_idxs[indices[j]];
         }
 
-        // xprintf("Example %d, Nearest Neighbhours: [%u, %u, %u, %u, %u] ", i, indices[0], indices[1], indices[2], indices[3], indices[4]);
+        // xprintf("Example %d, Nearest Neighbhours: [%u, %u, %u, %u, %u] \r\n", i, indices[0], indices[1], indices[2], indices[3], indices[4]);
         predicted_labels[i] = predict_label(indices, fun_args->labels, kNN_k);
     }
-
-    // Move subset data examples located in RAM to EEPROM
-    move_subset_to_eeprom(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, fun_args);
 
     // Output generated subset and label predictions
     read_buffer(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), num_per_line);
     xprintf("subset_idxs_read_done\r\n");
     read_buffer(predicted_labels, NUM_OF_IMGS_TOTAL, sizeof(uint8_t), num_per_line);
     xprintf("predicted_labels_read_done\r\n");
+
+    // Move subset data examples located in RAM to EEPROM
+    move_subset_to_eeprom(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, fun_args);
 
     free(subset_idxs);
     free(temp_dist_buf);

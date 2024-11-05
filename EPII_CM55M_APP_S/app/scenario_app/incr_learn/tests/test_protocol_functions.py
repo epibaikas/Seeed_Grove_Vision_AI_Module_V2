@@ -133,6 +133,8 @@ def test_rand_subset_selection():
     expected_predicted_labels = predict_labels(img_data[:, data_bytes_per_img],
                                                expected_dist_matrix, subset_idxs, k_kNN=3)
 
+    assert np.array_equal(expected_predicted_labels, predicted_labels)
+
     # Check if RAM subset data have been transferred correctly to EEPROM
     eeprom_idxs_set = set(range(N_RAM_BUFFER, N_TOTAL))
     subset_idxs_set = set(subset_idxs)
@@ -148,6 +150,3 @@ def test_rand_subset_selection():
                      ser=ser, req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
         seq_num += 1
         assert np.array_equal(img_data[ram_subset_idxs[i]], data_read_buffer)
-
-
-    assert np.array_equal(expected_predicted_labels, predicted_labels)

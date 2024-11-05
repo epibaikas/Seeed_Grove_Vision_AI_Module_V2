@@ -62,6 +62,9 @@ with serial.Serial(port, baudrate, timeout=None) as ser:
     resp_log = open(os.path.join(log_dir_path, 'responses_log.txt'), 'w')
 
     seq_num = 0
+    command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed],
+                                        ser=ser, req_log=req_log, resp_log=resp_log)
+    seq_num += 1
 
     for i in range(N_TOTAL):
         if i < N_RAM_BUFFER:
@@ -105,16 +108,9 @@ with serial.Serial(port, baudrate, timeout=None) as ser:
     # Check if predicted labels match the expected predicted labels
     expected_predicted_labels = predict_labels(img_data[:, data_bytes_per_img], expected_dist_matrix, subset_idxs, k_kNN=3)
 
-    np.save(os.path.join(log_dir_path, 'subset_idxs'), subset_idxs)
-    np.save(os.path.join(log_dir_path, 'expected_predicted_labels'),  expected_predicted_labels)
-    np.save(os.path.join(log_dir_path, 'predicted_labels'), predicted_labels)
-
     for i, _ in enumerate(predicted_labels):
-        print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is' , (expected_predicted_labels[i] == predicted_labels[i]))
-
-
-    # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = predict_labels(img_data[:, data_bytes_per_img], expected_dist_matrix, subset_idxs, k_kNN=3)
+        print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))
+        assert expected_predicted_labels[i] == predicted_labels[i]
 
     req_log.close()
     resp_log.close()
