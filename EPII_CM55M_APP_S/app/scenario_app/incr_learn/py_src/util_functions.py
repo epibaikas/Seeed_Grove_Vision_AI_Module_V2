@@ -1,5 +1,5 @@
 import numpy as np
-
+import configparser
 def get_symmetric_2D_array_index(array_size, i, j):
     if i > j:
         # Because of symmetry: A[i][j] == A[j][i], so swap i and j
@@ -39,3 +39,46 @@ def predict_labels(y_train, dist_matrix, subset_idxs, k_kNN):
     kNN_label_counts = [np.bincount(row) for row in kNN_labels]
     y_pred = np.stack([np.argmax(row) for row in kNN_label_counts])
     return y_pred
+
+def read_config():
+    # Create a ConfigParser object
+    config = configparser.ConfigParser()
+
+    # Read the configuration file
+    config.read('config/config.ini')
+
+    # Access values from the configuration file
+    # Settings
+    port = config.get(section='settings', option='port')
+    baudrate = config.getint(section='settings', option='baudrate')
+    bytes_per_img = config.getint(section='settings', option='bytes_per_img')
+    data_bytes_per_img = bytes_per_img - 1
+
+    N_RAM_BUFFER = config.getint(section='settings', option='N_RAM_BUFFER')
+    N_EEPROM_BUFFER = config.getint(section='settings', option='N_EEPROM_BUFFER')
+    N_TOTAL = N_RAM_BUFFER + N_EEPROM_BUFFER
+
+    base_flash_addr = config.get(section='settings', option='base_flash_addr')
+    num_per_line = config.getint(section='settings', option='num_per_line')
+
+    random_seed = config.getint(section='settings', option='random_seed')
+
+    # Paths
+    log_dir_path = config.get(section='paths', option='log_dir_path')
+
+    # Return a dictionary with the retrieved values
+    config_values = {
+        'port': port,
+        'baudrate': baudrate,
+        'bytes_per_img': bytes_per_img,
+        'data_bytes_per_img': data_bytes_per_img,
+        'N_RAM_BUFFER': N_RAM_BUFFER,
+        'N_EEPROM_BUFFER': N_EEPROM_BUFFER,
+        'N_TOTAL': N_TOTAL,
+        'base_flash_addr': base_flash_addr,
+        'num_per_line': num_per_line,
+        'random_seed': random_seed,
+        'log_dir_path': log_dir_path
+    }
+
+    return config_values

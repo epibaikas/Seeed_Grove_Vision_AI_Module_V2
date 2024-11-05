@@ -1,24 +1,38 @@
 import serial
 import numpy as np
+import configparser
 import os
 
 from protocol_functions import *
 from util_functions import *
 from data_utils import load_dataset, get_class_example_indices, get_random_balanced_subset_indices
 
-port = '/dev/cu.usbmodem578D0263771'
-baudrate = 921600
+# Create a ConfigParser object
+config = configparser.ConfigParser()
 
-bytes_per_img = 785
+# Read the configuration file
+config.read('config/config.ini')
+
+# Access values from the configuration file
+# Settings
+port = config.get(section='settings', option='port')
+baudrate = config.getint(section='settings', option='baudrate')
+bytes_per_img = config.getint(section='settings', option='bytes_per_img')
 data_bytes_per_img = bytes_per_img - 1
-N_RAM_BUFFER = 400
-N_EEPROM_BUFFER = 800
-N_TOTAL = N_RAM_BUFFER + N_EEPROM_BUFFER
-base_flash_addr = 0x00201000
-num_per_line = 28
 
-# Set random seeds
-random_seed = 42
+N_RAM_BUFFER = config.getint(section='settings', option='N_RAM_BUFFER')
+N_EEPROM_BUFFER = config.getint(section='settings', option='N_EEPROM_BUFFER')
+N_TOTAL = N_RAM_BUFFER + N_EEPROM_BUFFER
+
+base_flash_addr = config.get(section='settings', option='base_flash_addr')
+num_per_line = config.getint(section='settings', option='num_per_line')
+
+random_seed = config.getint(section='settings', option='random_seed')
+
+# Paths
+log_dir_path = config.get(section='paths', option='log_dir_path')
+
+# Set random seed
 np.random.seed(random_seed)
 
 dataset_name = 'FashionMNIST'
