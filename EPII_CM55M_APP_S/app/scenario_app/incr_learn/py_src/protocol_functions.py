@@ -42,13 +42,13 @@ def send_command(command_name, seq_num, param_list, ser, req_log, resp_log, data
     return command_return_value
 
 
-def write_ram_buffer(param_list, data, ser, req_log, resp_log):
+def write_ram_buffer(param_list, data_example, ser, req_log, resp_log):
     if len(param_list) != 2:
         return -1
 
     example_num = param_list[0]
     num_per_line = param_list[1]
-    write_buffer(data[example_num], data.shape[1], num_per_line, ser, req_log, resp_log)
+    write_buffer(data_example, data_example.shape[0], num_per_line, ser, req_log, resp_log)
     return 0
 
 
@@ -64,13 +64,13 @@ def read_ram_buffer(param_list, data_read_buffer, ser, req_log, resp_log):
     return 0
 
 
-def write_eeprom(param_list, img, ser, req_log, resp_log):
+def write_eeprom(param_list, data_example, ser, req_log, resp_log):
     if len(param_list) != 2:
         return -1
 
     example_num = param_list[0]
     num_per_line = param_list[1]
-    write_buffer(img, img.shape[0], num_per_line, ser, req_log, resp_log)
+    write_buffer(data_example, data_example.shape[0], num_per_line, ser, req_log, resp_log)
     return 0
 
 

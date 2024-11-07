@@ -66,21 +66,6 @@ def get_random_balanced_subset_indices(dataset, classes, subset_size):
         class_subset_idxs = np.random.choice(class_idxs, class_subset_size, replace=False)
         idxs += list(class_subset_idxs)
 
-    # for class_num, _ in enumerate(dataset.classes):
-    #     # Get all the indices corresponding to the class number
-    #     class_idxs = torch.nonzero((dataset.targets == class_num))
-    #     # Remove unnecessary dimensions and convert to numpy array
-    #     class_idxs = torch.squeeze(class_idxs).numpy()
-    #
-    #     # Set the number of examples to be selected from the given class depending on the portion that it occupies in
-    #     # complete dataset
-    #     class_subset_size = (int)((class_idxs.size / dataset_size) * subset_size)
-    #
-    #     # Get a random sample of the indices
-    #     class_idxs = np.random.choice(class_idxs, class_subset_size, replace=False)
-    #
-    #     idxs += list(class_idxs)
-
     return idxs
 def get_class_example_indices(dataset, class_num):
     class_idxs = torch.nonzero((dataset.targets == class_num))

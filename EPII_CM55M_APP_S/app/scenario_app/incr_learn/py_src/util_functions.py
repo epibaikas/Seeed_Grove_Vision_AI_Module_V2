@@ -1,5 +1,7 @@
 import numpy as np
 import configparser
+import os
+
 def get_symmetric_2D_array_index(array_size, i, j):
     if i > j:
         # Because of symmetry: A[i][j] == A[j][i], so swap i and j
@@ -40,12 +42,12 @@ def predict_labels(y_train, dist_matrix, subset_idxs, k_kNN):
     y_pred = np.stack([np.argmax(row) for row in kNN_label_counts])
     return y_pred
 
-def read_config():
+def read_config(config_dir_path):
     # Create a ConfigParser object
     config = configparser.ConfigParser()
 
     # Read the configuration file
-    config.read('config/config.ini')
+    config.read(os.path.join(config_dir_path, 'config.ini'))
 
     # Access values from the configuration file
     # Settings
@@ -65,6 +67,8 @@ def read_config():
 
     # Paths
     log_dir_path = config.get(section='paths', option='log_dir_path')
+    results_dir_path = config.get(section='paths', option='results_dir_path')
+    plots_dir_path = config.get(section='paths', option='plots_dir_path')
 
     # Return a dictionary with the retrieved values
     config_values = {
@@ -78,7 +82,9 @@ def read_config():
         'base_flash_addr': base_flash_addr,
         'num_per_line': num_per_line,
         'random_seed': random_seed,
-        'log_dir_path': log_dir_path
+        'log_dir_path': log_dir_path,
+        'results_dir_path': results_dir_path,
+        'plots_dir_path': plots_dir_path
     }
 
     return config_values
