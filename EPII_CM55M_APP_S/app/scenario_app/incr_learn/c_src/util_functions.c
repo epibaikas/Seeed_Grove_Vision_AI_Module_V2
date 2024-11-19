@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "xprintf.h"
 #include "spi_eeprom_comm.h"
 #include "incr_learn.h"
@@ -108,6 +109,35 @@ void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs) {
 
     // Free the dynamically allocated memory
     free(idx_array);
+}
+
+void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs) {
+    uint32_t target_label_count = 0;
+    uint16_t *label_idxs;
+    int num_of_class_examples_in_subset = 0;
+    int idx = 0;
+
+    for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
+        // Get the indices of the examples belonging to the target class
+        label_idxs = find_label_indices(labels, NUM_OF_IMGS_TOTAL, i, &target_label_count);
+         
+
+         if (label_idxs != NULL) {
+            // Shuffle the obtained indices
+            shuffle(label_idxs, target_label_count);
+
+            // Calculate how many examples from that class will be moved to the subset
+            num_of_class_examples_in_subset = ceil(NUM_OF_IMGS_IN_EEPROM_BUFFER * (target_label_count / (float) NUM_OF_IMGS_TOTAL));
+
+            // Place the example indices to the subset
+            // Check that you are not exceeding the size of the subset_idxs array
+
+            for (int j = 0; (j < num_of_class_examples_in_subset) && (idx + j < NUM_OF_IMGS_IN_EEPROM_BUFFER); j++) {
+                subset_idxs[idx + j] = label_idxs[j];
+            }
+            idx += num_of_class_examples_in_subset;
+         }
+    }
 }
 
 // Comparator function for sorting subset indices in ascending order
@@ -255,6 +285,75 @@ void update_labels_buffer(struct FunctionArguments *fun_args) {
             fun_args->labels[i] = fun_args->eeprom_buffer[0];
         }
     }
+}
+
+uint16_t* find_label_indices(uint8_t *labels, uint16_t labels_array_size, uint8_t target_label, uint32_t *target_label_count) {
+    // Initialize target_label_count to 0
+    *target_label_count = 0;
+
+    // First, count how many times the target label appears
+    for (int i = 0; i < labels_array_size; i++) {
+        if (labels[i] == target_label) {
+            (*target_label_count)++;
+        }
+    }
+
+    // If the target label is not found, return NULL
+    if (*target_label_count == 0) {
+        return NULL;
+    }
+
+    // Allocate memory to store the indices of the examples with the target label
+    uint16_t* label_idxs = (uint16_t*)calloc(*target_label_count, sizeof(uint16_t));
+    if (label_idxs == NULL) {
+        xprintf("mem_error: memory allocation for label_idxs failed\r\n");
+        exit(1);
+    }
+
+    // Collect the indices
+    int idx = 0;
+    for (int i = 0; i < labels_array_size; i++) {
+        if (labels[i] == target_label) {
+            label_idxs[idx++] = i;
+        }
+    }
+
+    return label_idxs;
+}
+
+void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_idxs, uint8_t* predicted_labels) {
+    uint16_t* temp_dist_buf = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
+    uint16_t* indices = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
+    if (temp_dist_buf == NULL || indices == NULL) {
+        xprintf("mem_error: memory allocation for temp_dist_buf or indices failed\r\n");
+		exit(1);
+    }
+
+
+    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+        // Load temporary buffer with the distances between the i-th examples and all the examples in the subset
+        for (int j = 0; j < NUM_OF_IMGS_IN_EEPROM_BUFFER; j++) {
+            temp_dist_buf[j] = get_symmetric_2D_array_value(fun_args->dist_matrix, NUM_OF_IMGS_TOTAL, i, subset_idxs[j]);
+        }
+
+        // Initialise indices buffer
+        for (size_t i = 0; i < NUM_OF_IMGS_IN_EEPROM_BUFFER; i++) {
+            indices[i] = i;
+        }
+        // Get the indices that short temp_dist_buf in ascending distance order
+        qsort_r(indices, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), (void *) temp_dist_buf, compare_indices);
+
+        // Convert the indices to the corresponding subset_idxs
+        for (int j = 0; j < NUM_OF_IMGS_IN_EEPROM_BUFFER; j++) {
+            indices[j] = subset_idxs[indices[j]];
+        }
+
+        // xprintf("Example %d, Nearest Neighbhours: [%u, %u, %u, %u, %u] \r\n", i, indices[0], indices[1], indices[2], indices[3], indices[4]);
+        predicted_labels[i] = predict_label(indices, fun_args->labels, kNN_k);
+    }
+
+    free(temp_dist_buf);
+    free(indices);
 }
 
 void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args) {

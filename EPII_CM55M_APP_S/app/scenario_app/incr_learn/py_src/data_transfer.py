@@ -90,7 +90,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     # Check correctness of read labels
     assert np.array_equal(img_data[:, config['bytes_per_img'] - 1], labels_buffer)
 
-    send_command(rand_subset_selection, seq_num=seq_num, param_list=[200], ser=ser, req_log=req_log,
+    send_command(rand_subset_selection, seq_num=seq_num, param_list=[0, 200], ser=ser, req_log=req_log,
                  resp_log=resp_log, data_out=[subset_idxs, predicted_labels])
     seq_num += 1
 

@@ -121,10 +121,10 @@ def read_dist_matrix(param_list, dist_array, ser, req_log, resp_log):
 
 
 def rand_subset_selection(param_list, data_out, ser, req_log, resp_log):
-    if len(param_list) != 1:
+    if len(param_list) != 2:
         return -1
 
-    num_per_line = param_list[0]
+    num_per_line = param_list[1]
 
     read_buffer(data_out[0], data_out[0].shape[0], num_per_line, ser, req_log, resp_log)
 

@@ -11,6 +11,7 @@ if __name__ == '__main__':
                                      'experiments on Seeed Grove Vision AI Module V2')
 
     parser.add_argument('dataset', type=str, help='The name of the dataset to be used')
+    parser.add_argument('balanced', type=positive_int, help='Balanced subset option')
     parser.add_argument('trial', type=positive_int,
                         help='The experiment trial number used to adjust random seed for random sampling functions')
 
@@ -18,6 +19,7 @@ if __name__ == '__main__':
 
     # Get the arguments
     dataset_name = args['dataset']
+    balanced = args['balanced']
     trial = args['trial']
 
     # Get configuration parameters
@@ -36,7 +38,10 @@ if __name__ == '__main__':
     train_data[:, 0:config['data_bytes_per_img']] = X_train.numpy().astype(np.uint8)
     train_data[:, config['data_bytes_per_img']] = y_train.numpy().astype(np.uint8)
 
-    filename_prefix = f'{dataset_name}_rand_sub_selection_trial={trial}_'
+    if balanced == 1:
+        filename_prefix = f'{dataset_name}_rand_bal_sub_selection_trial={trial}_'
+    else:
+        filename_prefix = f'{dataset_name}_rand_sub_selection_trial={trial}_'
 
     # Class sequence
     class_seq = range(0, len(train_set.classes))
@@ -47,8 +52,8 @@ if __name__ == '__main__':
     device_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_img']), dtype=np.uint8)
     acc = np.zeros(len(class_seq) - 1, dtype=float)
 
-    # Keep track of the reference indices of the data examples on the device
-    # device_data_example_idxs = np.zeros(config['N_TOTAL'], dtype=np.uint16)
+    # Keep track of the indices of the data examples on the device with regard to the full training set
+    device_data_idxs = np.zeros(config['N_TOTAL'], dtype=np.uint16)
 
     # Start serial connection
     memory_alloc_complete = False
@@ -73,6 +78,7 @@ if __name__ == '__main__':
         # Prime EEPROM with examples from the 0th class ----------------------------------------------------------------
         class_idxs = get_class_example_indices(train_set, class_seq[0])
         class_subset_idxs = np.random.choice(class_idxs, config['N_EEPROM_BUFFER'], replace=False)
+        device_data_idxs[config['N_RAM_BUFFER'] : config['N_TOTAL']] = class_subset_idxs
 
         for i in range(config['N_RAM_BUFFER'], config['N_TOTAL']):
             data_example = train_data[class_subset_idxs[i - config['N_RAM_BUFFER']]]
@@ -87,6 +93,7 @@ if __name__ == '__main__':
         for t in range(1, len(class_seq)):
             class_idxs = get_class_example_indices(train_set, class_seq[t])
             class_subset_idxs = np.random.choice(class_idxs, config['N_RAM_BUFFER'], replace=False)
+            device_data_idxs[0:config['N_RAM_BUFFER']] = class_subset_idxs
 
             for i in range(config['N_RAM_BUFFER']):
                 data_example = train_data[class_subset_idxs[i]]
@@ -102,7 +109,7 @@ if __name__ == '__main__':
             seq_num += 1
 
             # Run subset selection
-            send_command(rand_subset_selection, seq_num=seq_num, param_list=[200], ser=ser, req_log=req_log,
+            send_command(rand_subset_selection, seq_num=seq_num, param_list=[balanced, 200], ser=ser, req_log=req_log,
                          resp_log=resp_log, data_out=[subset_idxs, predicted_labels])
             seq_num += 1
 
@@ -112,6 +119,9 @@ if __name__ == '__main__':
             subset_data = device_data[subset_idxs]
             device_data[0:config['N_RAM_BUFFER']] = np.zeros(shape=(config['N_RAM_BUFFER'], config['bytes_per_img']))
             device_data[config['N_RAM_BUFFER']:config['N_TOTAL']] = subset_data
+
+            subset_data_idxs = device_data_idxs[subset_idxs]
+            device_data_idxs[config['N_RAM_BUFFER']:config['N_TOTAL']] = subset_data_idxs
 
         # Create results directory if it doesn't exist
         if not os.path.exists(config['results_dir_path']):

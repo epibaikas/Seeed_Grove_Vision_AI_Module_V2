@@ -115,7 +115,9 @@ def test_read_labels_buffer():
 
 def test_rand_subset_selection():
     global seq_num
-    send_command(rand_subset_selection, seq_num=seq_num, param_list=[200], ser=ser, req_log=req_log,
+
+    # Check random balanced subset selection ---------------------------------------------------------------------------
+    send_command(rand_subset_selection, seq_num=seq_num, param_list=[1, 200], ser=ser, req_log=req_log,
                  resp_log=resp_log, data_out=[subset_idxs, predicted_labels])
     seq_num += 1
 

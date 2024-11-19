@@ -225,10 +225,11 @@ void read_dist_matrix(struct FunctionArguments *fun_args) {
 }
 
 void rand_subset_selection(struct FunctionArguments *fun_args) {
+    int balanced_subset = 0; 
     int num_per_line = 8;
     int sscanf_ret_value = 0;
 
-    sscanf_ret_value = sscanf(fun_args->param, "%d", &num_per_line);
+    sscanf_ret_value = sscanf(fun_args->param, "%d %d",  &balanced_subset, &num_per_line);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: rand_subset_selection() parameters not parsed correctly\r\n");
         exit(1);
@@ -236,43 +237,25 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
-    // Generate random subset
+    // Generate subset
     uint16_t* subset_idxs = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
-    uint16_t* temp_dist_buf = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
-    uint16_t* indices = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
     uint8_t* predicted_labels = calloc(NUM_OF_IMGS_TOTAL, sizeof(uint8_t));
-    if (subset_idxs == NULL || temp_dist_buf == NULL || indices == NULL || predicted_labels == NULL) {
-        xprintf("mem_error: memory allocation for subset_idxs, temp_dist_buf, indices or predicted_labels failed\r\n");
+    if (subset_idxs == NULL || predicted_labels == NULL) {
+        xprintf("mem_error: memory allocation for subset_idxs or predicted_labels failed\r\n");
 		exit(1);
     }
 
-    get_random_subset(NUM_OF_IMGS_IN_EEPROM_BUFFER, NUM_OF_IMGS_TOTAL, subset_idxs);
-
     // Update the labels buffer
     update_labels_buffer(fun_args);
+    
+    if (balanced_subset == 1) {
+        get_random_bal_subset(fun_args->labels, subset_idxs);
+    } else {
+        get_random_subset(NUM_OF_IMGS_IN_EEPROM_BUFFER, NUM_OF_IMGS_TOTAL, subset_idxs);
+    }
 
     // Classify all examples using the subset
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
-        // Load temporary buffer with the distances between the i-th examples and all the examples in the subset
-        for (int j = 0; j < NUM_OF_IMGS_IN_EEPROM_BUFFER; j++) {
-            temp_dist_buf[j] = get_symmetric_2D_array_value(fun_args->dist_matrix, NUM_OF_IMGS_TOTAL, i, subset_idxs[j]);
-        }
-
-        // Initialise indices buffer
-        for (size_t i = 0; i < NUM_OF_IMGS_IN_EEPROM_BUFFER; i++) {
-            indices[i] = i;
-        }
-        // Get the indices that short temp_dist_buf in ascending distance order
-        qsort_r(indices, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), (void *) temp_dist_buf, compare_indices);
-
-        // Convert the indices to the corresponding subset_idxs
-        for (int j = 0; j < NUM_OF_IMGS_IN_EEPROM_BUFFER; j++) {
-            indices[j] = subset_idxs[indices[j]];
-        }
-
-        // xprintf("Example %d, Nearest Neighbhours: [%u, %u, %u, %u, %u] \r\n", i, indices[0], indices[1], indices[2], indices[3], indices[4]);
-        predicted_labels[i] = predict_label(indices, fun_args->labels, kNN_k);
-    }
+    classify_training_set(fun_args, subset_idxs, predicted_labels);
 
     // Output generated subset and label predictions
     read_buffer(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), num_per_line);
@@ -284,8 +267,6 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     move_subset_to_eeprom(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, fun_args);
 
     free(subset_idxs);
-    free(temp_dist_buf);
-    free(indices);
     free(predicted_labels);
 }
 

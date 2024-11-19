@@ -12,6 +12,7 @@ uint32_t dot_prod_uint8_vect(uint8_t* pSrcA, uint8_t* pSrcB, uint32_t blockSize)
 
 void shuffle(uint16_t *array, uint32_t size);
 void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs);
+void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs);
 
 int compare_subset_indices(const void *a, const void *b);
 int compare_indices(void *arr, const void *a, const void *b);
@@ -23,5 +24,7 @@ void get_example_flash_addr(int example_num, int* flash_sector_num, uint32_t* fl
 void write_buffer(uint8_t* buffer, uint32_t buffer_size, int num_per_line);
 void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size,  int num_per_line);
 void update_labels_buffer(struct FunctionArguments *fun_args);
+uint16_t* find_label_indices(uint8_t *labels, uint16_t labels_array_size, uint8_t target_label, uint32_t *target_label_count);
+void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_idxs, uint8_t* predicted_labels);
 void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args);
 #endif
