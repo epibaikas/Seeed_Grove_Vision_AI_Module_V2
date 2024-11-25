@@ -1,4 +1,6 @@
 import argparse
+import serial
+import time
 
 from protocol_functions import *
 from argparse_utlis import *
@@ -11,7 +13,7 @@ if __name__ == '__main__':
                                      'experiments on Seeed Grove Vision AI Module V2')
 
     parser.add_argument('dataset', type=str, help='The name of the dataset to be used')
-    parser.add_argument('balanced', type=positive_int, help='Balanced subset option')
+    parser.add_argument('balanced', type=int, help='Balanced subset option')
     parser.add_argument('trial', type=positive_int,
                         help='The experiment trial number used to adjust random seed for random sampling functions')
 
@@ -51,6 +53,8 @@ if __name__ == '__main__':
     predicted_labels = np.zeros(config['N_TOTAL'], dtype=np.uint8)
     device_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_img']), dtype=np.uint8)
     acc = np.zeros(len(class_seq) - 1, dtype=float)
+    compute_dist_time = np.zeros(len(class_seq) - 1, dtype=float)
+    subset_selection_time = np.zeros(len(class_seq) - 1, dtype=float)
 
     # Keep track of the indices of the data examples on the device with regard to the full training set
     device_data_idxs = np.zeros(config['N_TOTAL'], dtype=np.uint16)
@@ -64,16 +68,22 @@ if __name__ == '__main__':
                 print(line, end='')
                 memory_alloc_complete = True
 
-        # Create log directory if it doesn't exist
-        if not os.path.exists(config['log_dir_path']):
-            os.mkdir(config['log_dir_path'])
+        # TODO: Update logging
+        # Create log/txt directory if it doesn't exist
+        log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
+        if not os.path.exists(log_txt_dir_path):
+            os.makedirs(log_txt_dir_path)
 
-        req_log = open(os.path.join(config['log_dir_path'], filename_prefix + 'requests_log.txt'), 'w')
-        resp_log = open(os.path.join(config['log_dir_path'], filename_prefix + 'responses_log.txt'), 'w')
+        req_log_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'requests_log.txt')
+        resp_log_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'responses_log.txt')
+        req_logger, resp_logger = get_loggers(req_log_file_path, resp_log_file_path, debug=config['debug'])
+
+        util = {'ser': ser,
+                'req_logger': req_logger,
+                'resp_logger': resp_logger}
 
         # Set random seed ----------------------------------------------------------------------------------------------
-        send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed], ser=ser, req_log=req_log,
-                     resp_log=resp_log)
+        send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed], util=util)
 
         # Prime EEPROM with examples from the 0th class ----------------------------------------------------------------
         class_idxs = get_class_example_indices(train_set, class_seq[0])
@@ -84,8 +94,8 @@ if __name__ == '__main__':
             data_example = train_data[class_subset_idxs[i - config['N_RAM_BUFFER']]]
             device_data[i] = data_example
 
-            send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line']], ser=ser,
-                         req_log=req_log, resp_log=resp_log, data_in=data_example)
+            send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']),
+                        config['num_per_line']], util=util, data_in=data_example)
             seq_num += 1
 
         # Write examples for next class in the sequence to RAM buffer, perform subset selection and --------------------
@@ -99,19 +109,22 @@ if __name__ == '__main__':
                 data_example = train_data[class_subset_idxs[i]]
                 device_data[i] = data_example
 
-                send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], ser=ser,
-                             req_log=req_log, resp_log=resp_log, data_in=data_example)
+                send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util,
+                             data_in=data_example)
                 seq_num += 1
 
             # Compute dist matrix
-            send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], ser=ser, req_log=req_log,
-                         resp_log=resp_log)
+            time_start = time.time()
+            send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
             seq_num += 1
+            compute_dist_time[t - 1] = time.time() - time_start
 
             # Run subset selection
-            send_command(rand_subset_selection, seq_num=seq_num, param_list=[balanced, 200], ser=ser, req_log=req_log,
-                         resp_log=resp_log, data_out=[subset_idxs, predicted_labels])
+            time_start = time.time()
+            send_command(rand_subset_selection, seq_num=seq_num, param_list=[balanced, 200], util=util,
+                         data_out=[subset_idxs, predicted_labels])
             seq_num += 1
+            subset_selection_time[t - 1] = time.time() - time_start
 
             num_correct = np.sum(device_data[:, config['data_bytes_per_img']] == predicted_labels)
             acc[t - 1] = num_correct / config['N_TOTAL']
@@ -128,3 +141,5 @@ if __name__ == '__main__':
             os.mkdir(config['results_dir_path'])
 
         np.save(os.path.join(config['results_dir_path'], filename_prefix + 'acc'), acc)
+        np.save(os.path.join(config['results_dir_path'], filename_prefix + 'compute_dist_time'), compute_dist_time)
+        np.save(os.path.join(config['results_dir_path'], filename_prefix + 'subset_selection_time'), subset_selection_time)

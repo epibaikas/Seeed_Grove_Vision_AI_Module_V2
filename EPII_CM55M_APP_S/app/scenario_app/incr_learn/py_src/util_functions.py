@@ -1,5 +1,6 @@
 import numpy as np
 import configparser
+import logging
 import os
 
 def get_symmetric_2D_array_index(array_size, i, j):
@@ -64,6 +65,7 @@ def read_config(config_dir_path):
     num_per_line = config.getint(section='settings', option='num_per_line')
 
     random_seed = config.getint(section='settings', option='random_seed')
+    debug = config.getboolean(section='settings', option='debug')
 
     # Paths
     log_dir_path = config.get(section='paths', option='log_dir_path')
@@ -82,9 +84,36 @@ def read_config(config_dir_path):
         'base_flash_addr': base_flash_addr,
         'num_per_line': num_per_line,
         'random_seed': random_seed,
+        'debug': debug,
         'log_dir_path': log_dir_path,
         'results_dir_path': results_dir_path,
         'plots_dir_path': plots_dir_path
     }
 
     return config_values
+
+def get_loggers(req_log_file, resp_log_file, debug=False):
+    # Set logging level and formatter
+    logging_level = logging.DEBUG if debug else logging.INFO
+    logger_formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s', datefmt='%Y-%m-%d:%H:%M:%S')
+
+
+    # Request message logger
+    req_logger = logging.getLogger("req_logger")
+    req_logger.setLevel(logging_level)
+
+    req_logger_handler = logging.FileHandler(req_log_file, mode='w')
+    req_logger_handler.setFormatter(logger_formatter)
+
+    req_logger.addHandler(req_logger_handler)
+
+    # Response message logger
+    resp_logger = logging.getLogger("resp_logger")
+    resp_logger.setLevel(logging_level)
+
+    resp_logger_handler = logging.FileHandler(resp_log_file, mode='w')
+    resp_logger_handler.setFormatter(logger_formatter)
+
+    resp_logger.addHandler(resp_logger_handler)
+
+    return req_logger, resp_logger

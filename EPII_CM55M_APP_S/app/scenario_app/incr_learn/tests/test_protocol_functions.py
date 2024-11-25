@@ -46,19 +46,30 @@ while not memory_alloc_complete:
 
 seq_num = 0
 
-# Create log directory if it doesn't exist
-if not os.path.exists(config['log_dir_path']):
-    os.mkdir(config['log_dir_path'])
+# Create log/txt directory if it doesn't exist
+log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
+if not os.path.exists(log_txt_dir_path):
+    os.makedirs(log_txt_dir_path)
+
+req_log_file_path = os.path.join(log_txt_dir_path, 'test_requests_log.txt')
+resp_log_file_path = os.path.join(log_txt_dir_path, 'test_responses_log.txt')
+req_logger, resp_logger = get_loggers(req_log_file_path, resp_log_file_path, debug=config['debug'])
+
+# Create log/xml directory if it doesn't exist
+# log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
+# if not os.path.exists(log_xml_dir_path):
+#     os.makedirs(log_xml_dir_path)
 
 # Open log files
-req_log = open(os.path.join(config['log_dir_path'], 'test_requests_log.txt'), 'w')
-resp_log = open(os.path.join(config['log_dir_path'], 'test_responses_log.txt'), 'w')
+# req_log = open(os.path.join(log_txt_dir_path, 'test_requests_log.txt'), 'w')
+# resp_log = open(os.path.join(log_txt_dir_path, 'test_responses_log.txt'), 'w')
 
-
+util = {'ser': ser,
+        'req_logger': req_logger,
+        'resp_logger': resp_logger}
 def test_set_random_seed():
     global seq_num
-    command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[config['random_seed']],
-                                        ser=ser, req_log=req_log, resp_log=resp_log)
+    command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[config['random_seed']], util=util)
     seq_num += 1
     assert command_return_value == 0
 
@@ -66,11 +77,11 @@ def test_set_random_seed():
 def test_write_read_ram_buffer():
     global seq_num
     for i in range(config['N_RAM_BUFFER']):
-        send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], ser=ser,
-                     req_log=req_log, resp_log=resp_log, data_in=img_data[i])
+        send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util,
+                     data_in=img_data[i])
         seq_num += 1
-        send_command(read_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line'], config['bytes_per_img']], ser=ser,
-                     req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
+        send_command(read_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line'], config['bytes_per_img']],
+                     util=util, data_out=data_read_buffer)
         seq_num += 1
         assert np.array_equal(img_data[i], data_read_buffer)
 
@@ -79,21 +90,20 @@ def test_write_read_eeprom_buffer():
     global seq_num
     for i in range(config['N_RAM_BUFFER'], config['N_TOTAL']):
         send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line']],
-                     ser=ser, req_log=req_log, resp_log=resp_log, data_in=img_data[i])
+                     util=util, data_in=img_data[i])
         seq_num += 1
         send_command(read_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_img']],
-                     ser=ser, req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
+                     util=util, data_out=data_read_buffer)
         seq_num += 1
         assert np.array_equal(img_data[i], data_read_buffer)
 
 
 def test_compute_distance_matrix():
     global seq_num
-    send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], ser=ser, req_log=req_log, resp_log=resp_log)
+    send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
     seq_num += 1
 
-    send_command(read_dist_matrix, seq_num=seq_num, param_list=[200, config['N_TOTAL']], ser=ser, req_log=req_log,
-                 resp_log=resp_log, data_out=dist_array)
+    send_command(read_dist_matrix, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=dist_array)
     seq_num += 1
 
     # Check correctness of distance calculations
@@ -105,8 +115,8 @@ def test_compute_distance_matrix():
 
 def test_read_labels_buffer():
     global seq_num
-    send_command(read_labels_buffer, seq_num=seq_num, param_list=[200, config['N_TOTAL']], ser=ser, req_log=req_log,
-                 resp_log=resp_log, data_out=labels_buffer)
+    send_command(read_labels_buffer, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util,
+                 data_out=labels_buffer)
     seq_num += 1
 
     # Check correctness of read labels
@@ -117,8 +127,8 @@ def test_rand_subset_selection():
     global seq_num
 
     # Check random balanced subset selection ---------------------------------------------------------------------------
-    send_command(rand_subset_selection, seq_num=seq_num, param_list=[1, 200], ser=ser, req_log=req_log,
-                 resp_log=resp_log, data_out=[subset_idxs, predicted_labels])
+    send_command(rand_subset_selection, seq_num=seq_num, param_list=[1, 200], util=util,
+                 data_out=[subset_idxs, predicted_labels])
     seq_num += 1
 
     # Check if predicted labels match the expected predicted labels
@@ -139,6 +149,6 @@ def test_rand_subset_selection():
 
     for i, eeprom_idx in enumerate(eeprom_idxs_to_be_overwritten):
         send_command(read_eeprom, seq_num=seq_num, param_list=[(eeprom_idx - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_img']],
-                     ser=ser, req_log=req_log, resp_log=resp_log, data_out=data_read_buffer)
+                     util=util, data_out=data_read_buffer)
         seq_num += 1
         assert np.array_equal(img_data[ram_subset_idxs[i]], data_read_buffer)
