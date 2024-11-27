@@ -2,6 +2,9 @@ import numpy as np
 import configparser
 import logging
 import os
+from xml.etree import ElementTree as ET
+from xml.dom import minidom
+
 
 def get_symmetric_2D_array_index(array_size, i, j):
     if i > j:
@@ -117,3 +120,33 @@ def get_loggers(req_log_file, resp_log_file, debug=False):
     resp_logger.addHandler(resp_logger_handler)
 
     return req_logger, resp_logger
+
+def write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root):
+    # Pretty-print the XML files
+    req_log_xml_str = ET.tostring(req_log_xml_root, encoding="unicode")
+    req_log_xml_minidom = minidom.parseString(req_log_xml_str)
+    req_log_xml_str = req_log_xml_minidom.toprettyxml(indent='   ')
+    req_log_xml_str = '\n'.join(xml_line for xml_line in req_log_xml_str.split('\n') if xml_line.strip())
+
+    resp_log_xml_str = ET.tostring(resp_log_xml_root, encoding="unicode")
+    resp_log_xml_minidom = minidom.parseString(resp_log_xml_str)
+    resp_log_xml_str = resp_log_xml_minidom.toprettyxml(indent='   ')
+    resp_log_xml_str = '\n'.join(xml_line for xml_line in resp_log_xml_str.split('\n') if xml_line.strip())
+
+    with open(req_log_xml_file_path, 'w') as f:
+        f.write(req_log_xml_str)
+
+    with open(resp_log_xml_file_path, 'w') as f:
+        f.write(resp_log_xml_str)
+
+def board_init(ser):
+    board_init_complete = False
+    while not board_init_complete:
+        line = ser.readline().decode()  # read a '\n' terminated line and convert it to string
+        if line == 'Board initialisation complete\r\r\n':
+            print(line, end='')
+            board_init_complete = True
+
+def debug_print(message, end='\n', debug=False):
+    if debug:
+        print(message, end=end)

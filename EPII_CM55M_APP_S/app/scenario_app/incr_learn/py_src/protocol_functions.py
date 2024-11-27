@@ -1,19 +1,46 @@
+from xml.etree import ElementTree as ET
+from datetime import datetime as dt
+
+import numpy as np
+
+from util_functions import debug_print
 def send_command(command_name, seq_num, param_list, util, data_in=None, data_out=None):
-    command_return_value = 0
+    req_xml = ET.SubElement(util['req_log_xml_root'], 'request')
+    req_start_time_xml = ET.SubElement(req_xml, 'start_time')
+    req_end_time_xml = ET.SubElement(req_xml, 'end_time')
+    command_name_xml = ET.SubElement(req_xml, 'command_name')
+    param_list_xml = ET.SubElement(req_xml, 'param_list')
+    data_in_xml = ET.SubElement(req_xml, 'data_in')
+
+    resp_xml = ET.SubElement(util['resp_log_xml_root'], 'response')
+    resp_start_time_xml = ET.SubElement(resp_xml, 'start_time')
+    resp_end_time_xml = ET.SubElement(resp_xml, 'end_time')
+    data_out_xml = ET.SubElement(resp_xml, 'data_out')
+
     req_msg = 'begin {} {} '.format(seq_num, command_name.__name__) + ' '.join(
         [str(param) for param in param_list]) + '\r'
     util['req_logger'].info(req_msg)
+    req_xml.set('seq_num', str(seq_num))
+    command_name_xml.text = command_name.__name__
+    param_list_xml.text = str(param_list)
+
+    with np.printoptions(threshold=np.inf):
+        if type(data_in) != list:
+            data_in_xml.text = str([data_in])
+        else:
+            data_in_xml.text = str(data_in)
+
     util['ser'].write(req_msg.encode())
-
-    # Ensure that writing to logs has finished before moving to the next bit
-    # req_log.flush()
-    # resp_log.flush()
-
+    req_start_time_xml.text = str(dt.now())
     ack_line = util['ser'].readline().decode()
-    print(ack_line, end='')
+    debug_print(ack_line, end='', debug=util['debug'])
     util['resp_logger'].info(ack_line.rstrip())
+
     if ack_line != 'ack_begin {}\r\r\n'.format(seq_num):
         raise AssertionError('ack_begin not properly received')
+
+    resp_xml.set('seq_num', str(seq_num))
+    resp_start_time_xml.text = str(dt.now())
 
     if data_in is not None:
         command_return_value = command_name(param_list, data_in, util)
@@ -25,19 +52,23 @@ def send_command(command_name, seq_num, param_list, util, data_in=None, data_out
     req_msg = 'end {}\r'.format(seq_num)
     util['ser'].write(req_msg.encode())
     util['req_logger'].info(req_msg + '\n')
+    req_end_time_xml.text = str(dt.now())
 
     ack_line = util['ser'].readline().decode()
-    print(ack_line)
+    debug_print(ack_line, debug=util['debug'])
     util['resp_logger'].info(ack_line)
     if ack_line != 'ack_end {}\r\r\n'.format(seq_num):
         raise AssertionError('ack_end not properly received')
 
-    # Ensure that writing to logs has finished before moving to next command
-    # req_log.flush()
-    # resp_log.flush()
+    resp_end_time_xml.text = str(dt.now())
+
+    with np.printoptions(threshold=np.inf):
+        if type(data_out) != list:
+            data_out_xml.text = str([data_out])
+        else:
+            data_out_xml.text = str(data_out)
 
     return command_return_value
-
 
 def write_ram_buffer(param_list, data_example, util):
     if len(param_list) != 2:
@@ -96,7 +127,7 @@ def read_labels_buffer(param_list, labels_array, util):
 
 def compute_dist_matrix(param_list, util):
     resp_line = util['ser'].readline().decode()
-    print(resp_line, end='')
+    debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
     if resp_line != 'done\r\r\n':
@@ -126,7 +157,7 @@ def rand_subset_selection(param_list, data_out, util):
     read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
 
     resp_line = util['ser'].readline().decode()
-    print(resp_line, end='')
+    debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
     if resp_line != 'subset_idxs_read_done\r\r\n':
@@ -135,7 +166,7 @@ def rand_subset_selection(param_list, data_out, util):
     read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
 
     resp_line = util['ser'].readline().decode()
-    print(resp_line, end='')
+    debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
     if resp_line != 'predicted_labels_read_done\r\r\n':
@@ -154,7 +185,7 @@ def write_buffer(data, size, num_per_line, util):
         util['req_logger'].debug(req_msg)
 
         ack_line = util['ser'].readline().decode()
-        print(ack_line, end='')
+        debug_print(ack_line, end='', debug=util['debug'])
         util['resp_logger'].debug(ack_line.rstrip())
 
         if ack_line != req_msg + '\r\n':
@@ -163,7 +194,7 @@ def write_buffer(data, size, num_per_line, util):
 def read_buffer(array, size, num_per_line, util):
     for i in range(0, size, num_per_line):
         ack_line = util['ser'].readline().decode()
-        print(ack_line, end='')
+        debug_print(ack_line, end='', debug=util['debug'])
         util['resp_logger'].debug(ack_line.rstrip())
 
         values = ack_line.split()
@@ -185,7 +216,7 @@ def set_random_seed(param_list, util):
     random_seed = param_list[0]
 
     resp_line = util['ser'].readline().decode()
-    print(resp_line, end='')
+    debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
     if resp_line != f'random seed set to: {random_seed}\r\r\n':

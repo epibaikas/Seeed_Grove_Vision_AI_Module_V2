@@ -1,6 +1,8 @@
 import argparse
 import serial
 import time
+import sys
+from tqdm import tqdm
 
 from protocol_functions import *
 from argparse_utlis import *
@@ -60,37 +62,48 @@ if __name__ == '__main__':
     device_data_idxs = np.zeros(config['N_TOTAL'], dtype=np.uint16)
 
     # Start serial connection
-    memory_alloc_complete = False
     with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
-        while (not memory_alloc_complete):
-            line = ser.readline().decode()  # read a '\n' terminated line and convert it to string
-            if line == 'Memory allocation complete\r\r\n':
-                print(line, end='')
-                memory_alloc_complete = True
+        board_init(ser)
 
-        # TODO: Update logging
         # Create log/txt directory if it doesn't exist
         log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
         if not os.path.exists(log_txt_dir_path):
             os.makedirs(log_txt_dir_path)
 
-        req_log_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'requests_log.txt')
-        resp_log_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'responses_log.txt')
-        req_logger, resp_logger = get_loggers(req_log_file_path, resp_log_file_path, debug=config['debug'])
+        req_log_txt_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'requests_log.txt')
+        resp_log_txt_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'responses_log.txt')
+        req_logger, resp_logger = get_loggers(req_log_txt_file_path, resp_log_txt_file_path, debug=config['debug'])
+
+        # Create log/xml directory if it doesn't exist
+        log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
+        if not os.path.exists(log_xml_dir_path):
+            os.makedirs(log_xml_dir_path)
+
+        req_log_xml_file_path = os.path.join(log_xml_dir_path, filename_prefix + 'requests_log.txt')
+        resp_log_xml_file_path = os.path.join(log_xml_dir_path, filename_prefix + 'responses_log.txt')
+
+        # Create root elements
+        req_log_xml_root = ET.Element('requests')
+        resp_log_xml_root = ET.Element('response_log')
 
         util = {'ser': ser,
                 'req_logger': req_logger,
-                'resp_logger': resp_logger}
+                'resp_logger': resp_logger,
+                'req_log_xml_root': req_log_xml_root,
+                'resp_log_xml_root': resp_log_xml_root,
+                'debug': config['debug']}
 
         # Set random seed ----------------------------------------------------------------------------------------------
         send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed], util=util)
+        seq_num += 1
 
-        # Prime EEPROM with examples from the 0th class ----------------------------------------------------------------
+        # Prime EEPROM with examples from the 1st class ----------------------------------------------------------------
         class_idxs = get_class_example_indices(train_set, class_seq[0])
         class_subset_idxs = np.random.choice(class_idxs, config['N_EEPROM_BUFFER'], replace=False)
         device_data_idxs[config['N_RAM_BUFFER'] : config['N_TOTAL']] = class_subset_idxs
 
-        for i in range(config['N_RAM_BUFFER'], config['N_TOTAL']):
+        print('Priming EEPROM with examples from 1st class...')
+        for i in tqdm(range(config['N_RAM_BUFFER'], config['N_TOTAL']), file=sys.stdout):
             data_example = train_data[class_subset_idxs[i - config['N_RAM_BUFFER']]]
             device_data[i] = data_example
 
@@ -105,7 +118,8 @@ if __name__ == '__main__':
             class_subset_idxs = np.random.choice(class_idxs, config['N_RAM_BUFFER'], replace=False)
             device_data_idxs[0:config['N_RAM_BUFFER']] = class_subset_idxs
 
-            for i in range(config['N_RAM_BUFFER']):
+            print(f'Writing examples from class {t+1}...')
+            for i in tqdm(range(config['N_RAM_BUFFER']), file=sys.stdout):
                 data_example = train_data[class_subset_idxs[i]]
                 device_data[i] = data_example
 
@@ -114,12 +128,14 @@ if __name__ == '__main__':
                 seq_num += 1
 
             # Compute dist matrix
+            print('\tComputing distance matrix...')
             time_start = time.time()
             send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
             seq_num += 1
             compute_dist_time[t - 1] = time.time() - time_start
 
             # Run subset selection
+            print('\tRunning subset selection...')
             time_start = time.time()
             send_command(rand_subset_selection, seq_num=seq_num, param_list=[balanced, 200], util=util,
                          data_out=[subset_idxs, predicted_labels])
@@ -143,3 +159,6 @@ if __name__ == '__main__':
         np.save(os.path.join(config['results_dir_path'], filename_prefix + 'acc'), acc)
         np.save(os.path.join(config['results_dir_path'], filename_prefix + 'compute_dist_time'), compute_dist_time)
         np.save(os.path.join(config['results_dir_path'], filename_prefix + 'subset_selection_time'), subset_selection_time)
+
+        # Write xml logs to file
+        write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)

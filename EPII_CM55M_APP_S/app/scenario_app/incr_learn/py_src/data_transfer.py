@@ -35,26 +35,36 @@ labels_buffer = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
 predicted_labels = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 
-memory_alloc_complete = False
 with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
-    while(not memory_alloc_complete):
-        line = ser.readline().decode()   # read a '\n' terminated line and convert it to string
-        if line == 'Memory allocation complete\r\r\n':
-            print(line, end='')
-            memory_alloc_complete = True
+    board_init(ser)
 
     # Create log/txt directory if it doesn't exist
     log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
     if not os.path.exists(log_txt_dir_path):
         os.makedirs(log_txt_dir_path)
 
-    req_log_file_path = os.path.join(log_txt_dir_path, 'requests_log.txt')
-    resp_log_file_path = os.path.join(log_txt_dir_path, 'responses_log.txt')
-    req_logger, resp_logger = get_loggers(req_log_file_path, resp_log_file_path, debug=config['debug'])
+    req_log_txt_file_path = os.path.join(log_txt_dir_path, 'requests_log.txt')
+    resp_log_txt_file_path = os.path.join(log_txt_dir_path, 'responses_log.txt')
+    req_logger, resp_logger = get_loggers(req_log_txt_file_path, resp_log_txt_file_path, debug=config['debug'])
+
+    # Create log/xml directory if it doesn't exist
+    log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
+    if not os.path.exists(log_xml_dir_path):
+        os.makedirs(log_xml_dir_path)
+
+    req_log_xml_file_path = os.path.join(log_xml_dir_path, 'requests_log.xml')
+    resp_log_xml_file_path = os.path.join(log_xml_dir_path, 'responses_log.xml')
+
+    # Create root elements
+    req_log_xml_root = ET.Element('requests')
+    resp_log_xml_root = ET.Element('response_log')
 
     util = {'ser': ser,
             'req_logger': req_logger,
-            'resp_logger': resp_logger}
+            'resp_logger': resp_logger,
+            'req_log_xml_root': req_log_xml_root,
+            'resp_log_xml_root': resp_log_xml_root,
+            'debug': config['debug']}
 
     seq_num = 0
     command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[config['random_seed']], util=util)
@@ -103,3 +113,5 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     for i, _ in enumerate(predicted_labels):
         print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))
         assert expected_predicted_labels[i] == predicted_labels[i]
+
+    write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)

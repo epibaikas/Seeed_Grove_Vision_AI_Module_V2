@@ -202,7 +202,7 @@ int app_main(void) {
 	xprintf("Addr of labels buffer: 0x%08x\r\n", labels);
 	xprintf("RAND_MAX: 0x%08x\r\n", RAND_MAX);
 
-	xprintf("Memory allocation complete\r\n");
+	xprintf("Board initialisation complete\r\n");
 	//-----------------------------------------------------
 
 	while(1) {
