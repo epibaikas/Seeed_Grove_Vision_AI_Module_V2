@@ -4,8 +4,9 @@ import os
 import numpy as np
 from xml.etree import ElementTree as ET
 
-from util_functions import compute_distances, read_config, get_loggers, write_xml_files, board_init
+from util_functions import read_config, get_loggers, write_xml_files, board_init
 from data_utils import load_dataset, get_random_balanced_subset_indices
+from classifiers.k_nearest_neighbors_numpy import kNearestNeighbors
 
 @pytest.fixture(scope="session")
 def seq_num():
@@ -46,8 +47,10 @@ def dist_array(dist_array_size):
     return np.zeros(dist_array_size, dtype=np.uint16)
 
 @pytest.fixture
-def expected_dist_matrix(config, img_data):
-    return compute_distances(img_data, img_data, config['data_bytes_per_img'])
+def expected_classifier(config, img_data):
+    classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_img']], img_data[:, config['data_bytes_per_img']])
+    classifier.train(img_data[:, 0:config['data_bytes_per_img']], symmetric=True, bitshift=12)
+    return classifier
 
 @pytest.fixture
 def labels_buffer(config):

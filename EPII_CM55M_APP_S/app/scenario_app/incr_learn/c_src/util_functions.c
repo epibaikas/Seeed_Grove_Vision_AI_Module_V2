@@ -114,8 +114,14 @@ void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs) {
 void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs) {
     uint32_t target_label_count = 0;
     uint16_t *label_idxs;
-    int num_of_class_examples_in_subset = 0;
     int idx = 0;
+
+    // Get the same number of examples from every class
+    uint8_t num_of_available_classes = get_num_of_available_classes(labels);
+    int num_of_class_examples_in_subset = ceil(NUM_OF_IMGS_IN_EEPROM_BUFFER / (float) num_of_available_classes);
+    
+    // xprintf("num_of_available_classes: %u\n\r", num_of_available_classes);
+    // xprintf("num_of_class_examples_in_subset: %d\n\r", num_of_class_examples_in_subset);
 
     for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
         // Get the indices of the examples belonging to the target class
@@ -126,18 +132,29 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs) {
             // Shuffle the obtained indices
             shuffle(label_idxs, target_label_count);
 
-            // Calculate how many examples from that class will be moved to the subset
-            num_of_class_examples_in_subset = ceil(NUM_OF_IMGS_IN_EEPROM_BUFFER * (target_label_count / (float) NUM_OF_IMGS_TOTAL));
-
             // Place the example indices to the subset
             // Check that you are not exceeding the size of the subset_idxs array
-
             for (int j = 0; (j < num_of_class_examples_in_subset) && (idx + j < NUM_OF_IMGS_IN_EEPROM_BUFFER); j++) {
                 subset_idxs[idx + j] = label_idxs[j];
             }
             idx += num_of_class_examples_in_subset;
          }
     }
+
+    // uint16_t *label_counts = (uint16_t *)calloc(NUM_OF_CLASSES, sizeof(uint16_t));
+    // if (label_counts == NULL) {
+    //     xprintf("mem_error: memory allocation for label_counts failed\r\n");
+	// 	exit(1);
+    // }
+    
+    // for (int i = 0; i < NUM_OF_IMGS_IN_EEPROM_BUFFER; i++) {
+    //     label_counts[labels[subset_idxs[i]]]++;
+    // }
+
+    // for (int i = 0; i < NUM_OF_CLASSES; i++) {
+    //     xprintf("label %d, count: %u\r\n", i, label_counts[i]);
+    // }
+    // free(label_counts);
 }
 
 // Comparator function for sorting subset indices in ascending order
@@ -320,6 +337,30 @@ uint16_t* find_label_indices(uint8_t *labels, uint16_t labels_array_size, uint8_
 
     return label_idxs;
 }
+
+uint8_t get_num_of_available_classes(uint8_t *labels) {
+    uint8_t num_of_available_classes = 0;
+    
+    uint16_t *label_counts = (uint16_t *)calloc(NUM_OF_CLASSES, sizeof(uint16_t));
+    if (label_counts == NULL) {
+        xprintf("mem_error: memory allocation for label_counts failed\r\n");
+		exit(1);
+    }
+    
+    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+        label_counts[labels[i]]++;
+    }
+    
+    for (int i = 0; i < NUM_OF_CLASSES; i++) {
+        if (label_counts[i] > 0) {
+            num_of_available_classes++;
+        }
+    }
+
+    free(label_counts);
+    return num_of_available_classes;
+}
+
 
 void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_idxs, uint8_t* predicted_labels) {
     uint16_t* temp_dist_buf = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));

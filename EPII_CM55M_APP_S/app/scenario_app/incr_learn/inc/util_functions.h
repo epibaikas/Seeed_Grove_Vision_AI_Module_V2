@@ -25,6 +25,7 @@ void write_buffer(uint8_t* buffer, uint32_t buffer_size, int num_per_line);
 void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size,  int num_per_line);
 void update_labels_buffer(struct FunctionArguments *fun_args);
 uint16_t* find_label_indices(uint8_t *labels, uint16_t labels_array_size, uint8_t target_label, uint32_t *target_label_count);
+uint8_t get_num_of_available_classes(uint8_t *labels);
 void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_idxs, uint8_t* predicted_labels);
 void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args);
 #endif

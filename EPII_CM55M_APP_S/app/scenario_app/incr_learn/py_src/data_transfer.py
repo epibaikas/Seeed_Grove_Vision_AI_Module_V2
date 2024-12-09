@@ -4,7 +4,8 @@ import os
 
 from protocol_functions import *
 from util_functions import *
-from data_utils import load_dataset, get_class_example_indices, get_random_balanced_subset_indices
+from data_utils import load_dataset, get_random_balanced_subset_indices
+from classifiers.k_nearest_neighbors_numpy import kNearestNeighbors
 
 config_dir_path = 'config/'
 config = read_config(config_dir_path)
@@ -29,7 +30,8 @@ data_read_buffer = np.zeros(config['bytes_per_img'], np.uint8)
 dist_array_size = int(config['N_TOTAL'] * (config['N_TOTAL'] + 1) / 2)
 dist_array = np.zeros(dist_array_size, dtype=np.uint16)
 
-expected_dist_matrix = compute_distances(img_data, img_data, config['data_bytes_per_img'])
+expected_classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_img']], img_data[:, config['data_bytes_per_img']])
+expected_classifier.train(img_data[:, 0:config['data_bytes_per_img']], symmetric=True, bitshift=12)
 
 labels_buffer = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
@@ -96,7 +98,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
         for j in range(i, config['N_TOTAL']):
             idx = get_symmetric_2D_array_index(dist_array_size, i, j)
             # print('i={}, j={}, idx={}, {}, {}'.format(i, j, idx, expected_dist_matrix[i, j], dist_array[idx]))
-            assert expected_dist_matrix[i, j] == dist_array[idx]
+            assert expected_classifier.dists[i, j] == dist_array[idx]
 
     send_command(read_labels_buffer, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=labels_buffer)
     seq_num += 1
@@ -108,7 +110,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     seq_num += 1
 
     # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = predict_labels(img_data[:, config['data_bytes_per_img']], expected_dist_matrix, subset_idxs, k_kNN=3)
+    expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_img']], subset_idxs, train_classifier=False, k=3)
 
     for i, _ in enumerate(predicted_labels):
         print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))

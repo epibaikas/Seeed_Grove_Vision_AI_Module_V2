@@ -14,10 +14,10 @@ def load_dataset(dataset_name, device):
     else:
         raise argparse.ArgumentTypeError('Unknown dataset name')
 
-    X_train = train_set.data.type(torch.float32)
+    X_train = train_set.data.type(torch.int32)
     y_train = train_set.targets.type(torch.int8).to(device)
 
-    X_test = test_set.data.type(torch.float32)
+    X_test = test_set.data.type(torch.int32)
     y_test = test_set.targets.type(torch.int8).to(device)
 
     print('Dataset:', dataset_name)
@@ -33,15 +33,14 @@ def load_dataset(dataset_name, device):
 
 def ACC(classifier, X_test, y_test, subset_idxs, test_subset_idxs=[]):
     y_pred = classifier.predict(X_test, subset_idxs, train_classifier=False, k=3)
-    y_pred_np = y_pred.cpu().numpy()
 
     if len(test_subset_idxs) == 0:
         # Consider all the test examples in y_test
-        num_correct = np.sum(y_test.cpu().numpy() == y_pred_np)
+        num_correct = np.sum(y_test == y_pred)
         acc = num_correct / y_test.shape[0]
     else:
         # Consider only the test examples specified by test_subset_idxs
-        num_correct = np.sum(y_test[test_subset_idxs].cpu().numpy() == y_pred_np[test_subset_idxs])
+        num_correct = np.sum(y_test[test_subset_idxs] == y_pred[test_subset_idxs])
         acc = num_correct / y_test[test_subset_idxs].shape[0]
     return acc
 

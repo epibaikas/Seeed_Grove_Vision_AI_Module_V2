@@ -33,7 +33,7 @@ def test_write_read_eeprom_buffer(seq_num, config, img_data, util, data_read_buf
         assert np.array_equal(img_data[i], data_read_buffer)
 
 
-def test_compute_distance_matrix(seq_num, config, util, dist_array_size, dist_array, expected_dist_matrix):
+def test_compute_distance_matrix(seq_num, config, util, dist_array_size, dist_array, expected_classifier):
     send_command(compute_dist_matrix, seq_num=seq_num['value'], param_list=[], util=util)
     increment_seq_num(seq_num)
 
@@ -44,7 +44,7 @@ def test_compute_distance_matrix(seq_num, config, util, dist_array_size, dist_ar
     for i in range(config['N_TOTAL']):
         for j in range(i, config['N_TOTAL']):
             idx = get_symmetric_2D_array_index(dist_array_size, i, j)
-            assert expected_dist_matrix[i, j] == dist_array[idx]
+            assert expected_classifier.dists[i, j] == dist_array[idx]
 
 
 def test_read_labels_buffer(seq_num, config, img_data, util, labels_buffer):
@@ -56,7 +56,7 @@ def test_read_labels_buffer(seq_num, config, img_data, util, labels_buffer):
     assert np.array_equal(img_data[:, config['bytes_per_img'] - 1], labels_buffer)
 
 
-def test_rand_subset_selection(seq_num, config, img_data, util, subset_idxs, predicted_labels, expected_dist_matrix, data_read_buffer):
+def test_rand_subset_selection(seq_num, config, img_data, util, subset_idxs, predicted_labels, expected_classifier, data_read_buffer):
 
     # Check random balanced subset selection ---------------------------------------------------------------------------
     send_command(rand_subset_selection, seq_num=seq_num['value'], param_list=[1, 200], util=util,
@@ -64,9 +64,7 @@ def test_rand_subset_selection(seq_num, config, img_data, util, subset_idxs, pre
     increment_seq_num(seq_num)
 
     # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = predict_labels(img_data[:, config['data_bytes_per_img']],
-                                               expected_dist_matrix, subset_idxs, k_kNN=3)
-
+    expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_img']], subset_idxs, train_classifier=False, k=3)
     assert np.array_equal(expected_predicted_labels, predicted_labels)
 
     # Check if RAM subset data have been transferred correctly to EEPROM

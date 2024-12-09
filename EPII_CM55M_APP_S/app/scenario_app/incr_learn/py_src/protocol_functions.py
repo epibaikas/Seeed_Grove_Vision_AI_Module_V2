@@ -8,21 +8,23 @@ def send_command(command_name, seq_num, param_list, util, data_in=None, data_out
     req_xml = ET.SubElement(util['req_log_xml_root'], 'request')
     req_start_time_xml = ET.SubElement(req_xml, 'start_time')
     req_end_time_xml = ET.SubElement(req_xml, 'end_time')
-    command_name_xml = ET.SubElement(req_xml, 'command_name')
-    param_list_xml = ET.SubElement(req_xml, 'param_list')
+    req_command_name_xml = ET.SubElement(req_xml, 'command_name')
+    req_param_list_xml = ET.SubElement(req_xml, 'param_list')
     data_in_xml = ET.SubElement(req_xml, 'data_in')
 
     resp_xml = ET.SubElement(util['resp_log_xml_root'], 'response')
     resp_start_time_xml = ET.SubElement(resp_xml, 'start_time')
     resp_end_time_xml = ET.SubElement(resp_xml, 'end_time')
+    resp_command_name_xml = ET.SubElement(resp_xml, 'command_name')
+    resp_param_list_xml = ET.SubElement(resp_xml, 'param_list')
     data_out_xml = ET.SubElement(resp_xml, 'data_out')
 
     req_msg = 'begin {} {} '.format(seq_num, command_name.__name__) + ' '.join(
         [str(param) for param in param_list]) + '\r'
     util['req_logger'].info(req_msg)
     req_xml.set('seq_num', str(seq_num))
-    command_name_xml.text = command_name.__name__
-    param_list_xml.text = str(param_list)
+    req_command_name_xml.text = command_name.__name__
+    req_param_list_xml.text = str(param_list)
 
     with np.printoptions(threshold=np.inf):
         if type(data_in) != list:
@@ -40,6 +42,8 @@ def send_command(command_name, seq_num, param_list, util, data_in=None, data_out
         raise AssertionError('ack_begin not properly received')
 
     resp_xml.set('seq_num', str(seq_num))
+    resp_command_name_xml.text = command_name.__name__
+    resp_param_list_xml.text = str(param_list)
     resp_start_time_xml.text = str(dt.now())
 
     if data_in is not None:
