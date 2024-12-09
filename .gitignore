@@ -51,7 +51,14 @@ EPII_CM55M_APP_S/app/scenario_app/incr_learn/.idea/
 EPII_CM55M_APP_S/app/scenario_app/incr_learn/__pycache__/
 EPII_CM55M_APP_S/app/scenario_app/incr_learn/datasets/
 EPII_CM55M_APP_S/app/scenario_app/incr_learn/log/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/artifacts/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/results/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/plots/
 EPII_CM55M_APP_S/app/scenario_app/incr_learn/py_src/__pycache__/
+EPII_CM55M_APP_S/app/scenario_app/incr_learn/py_src/classifiers/__pycache__/
 EPII_CM55M_APP_S/app/scenario_app/incr_learn/tests/__pycache__/
+
+EPII_CM55M_APP_S/prebuilt_libs/
+we2_image_gen_local/secureboot_tool/
 
 .vscode/
