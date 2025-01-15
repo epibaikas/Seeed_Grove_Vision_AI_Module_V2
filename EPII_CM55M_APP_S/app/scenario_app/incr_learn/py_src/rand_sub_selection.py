@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     # Load dataset
     device = 'cpu'
-    train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, device)
+    train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
 
     X_train = X_train.numpy().astype(np.uint8)
     y_train = y_train.numpy().astype(np.uint8)

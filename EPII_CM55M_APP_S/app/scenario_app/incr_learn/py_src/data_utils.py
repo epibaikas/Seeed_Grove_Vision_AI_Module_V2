@@ -3,11 +3,12 @@ import torch
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 import argparse
-def load_dataset(dataset_name, device):
+
+def load_dataset(dataset_name, root_dir, device):
     # Get the dataset
     if dataset_name == 'FashionMNIST':
-        train_set = datasets.FashionMNIST(root='datasets/', download=True, transform=ToTensor(), train=True)
-        test_set = datasets.FashionMNIST(root='datasets/', download=True, transform=ToTensor(), train=False)
+        train_set = datasets.FashionMNIST(root=root_dir, download=True, transform=ToTensor(), train=True)
+        test_set = datasets.FashionMNIST(root=root_dir, download=True, transform=ToTensor(), train=False)
     elif dataset_name == 'MNIST':
         train_set = datasets.MNIST(root='datasets/', download=True, transform=ToTensor(), train=True)
         test_set = datasets.MNIST(root='datasets/', download=True, transform=ToTensor(), train=False)

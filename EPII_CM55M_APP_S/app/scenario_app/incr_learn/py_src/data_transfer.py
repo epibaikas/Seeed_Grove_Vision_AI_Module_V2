@@ -15,7 +15,7 @@ np.random.seed(config['random_seed'])
 
 dataset_name = 'FashionMNIST'
 device = 'cpu'
-train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, device)
+train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
 
 classes = []
 example_idxs = get_random_balanced_subset_indices(train_set, classes, subset_size=config['N_TOTAL'])

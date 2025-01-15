@@ -46,6 +46,7 @@ def read_config(config_dir_path):
     debug = config.getboolean(section='settings', option='debug')
 
     # Paths
+    datasets_dir_path = config.get(section='paths', option='datasets_dir_path')
     log_dir_path = config.get(section='paths', option='log_dir_path')
     artifacts_dir_path = config.get(section='paths', option='artifacts_dir_path')
     results_dir_path = config.get(section='paths', option='results_dir_path')
@@ -64,6 +65,7 @@ def read_config(config_dir_path):
         'num_per_line': num_per_line,
         'random_seed': random_seed,
         'debug': debug,
+        'datasets_dir_path': datasets_dir_path,
         'log_dir_path': log_dir_path,
         'artifacts_dir_path': artifacts_dir_path,
         'results_dir_path': results_dir_path,
