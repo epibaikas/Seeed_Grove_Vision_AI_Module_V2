@@ -7,7 +7,7 @@ import pickle
 from protocol_functions import *
 from argparse_utlis import *
 from util_functions import *
-from data_utils import load_dataset, ACC, get_random_balanced_subset_indices, get_class_example_indices
+from data_utils import load_dataset, ACC, get_class_example_indices
 from classifiers.k_nearest_neighbors_numpy import kNearestNeighbors
 
 if __name__ == '__main__':
@@ -16,7 +16,11 @@ if __name__ == '__main__':
                                      'experiments on Seeed Grove Vision AI Module V2')
 
     parser.add_argument('dataset', type=str, help='The name of the dataset to be used')
-    parser.add_argument('balanced', type=int, help='Balanced subset option')
+    parser.add_argument('sub_sel_func', type=int, help='Subset selection function (\'0\' for random '
+                                                       'selection, \'1\' for random balanced selection, \'2\' for '
+                                                       'random greedy')
+    parser.add_argument('seq', type=str,
+                        help='Enter \'high\' or  \'low\' for high\low accuracy sequence of classes respectively')
     parser.add_argument('trial', type=positive_int,
                         help='The experiment trial number used to adjust random seed for random sampling functions')
 
@@ -24,8 +28,13 @@ if __name__ == '__main__':
 
     # Get the arguments
     dataset_name = args['dataset']
-    balanced = args['balanced']
+    sub_sel_func = args['sub_sel_func']
+    seq_type = args['seq']
     trial = args['trial']
+
+    # Check that the class sequence is valid
+    if seq_type != 'high' and seq_type != 'low':
+        raise argparse.ArgumentTypeError('Invalid sequence type')
 
     # Get configuration parameters
     config_dir_path = 'config/'
@@ -34,6 +43,8 @@ if __name__ == '__main__':
     # Adjust the random seed based on the trial number
     random_seed = config['random_seed'] + trial
     np.random.seed(random_seed)
+
+    print(f'{dataset_name}, sub_sel_func={sub_sel_func}, seq_type={seq_type}, trial={trial}')
 
     # Load dataset
     device = 'cpu'
@@ -67,14 +78,22 @@ if __name__ == '__main__':
     train_data[:, 0:config['data_bytes_per_img']] = X_train.astype(np.uint8)
     train_data[:, config['data_bytes_per_img']] = y_train.astype(np.uint8)
 
-    if balanced == 1:
-        filename_prefix = f'{dataset_name}_rand_bal_sub_selection_trial={trial}_'
-    else:
-        filename_prefix = f'{dataset_name}_rand_sub_selection_trial={trial}_'
+    if sub_sel_func == 0:
+        filename_prefix = f'{dataset_name}_rand_sub_selection_seq={seq_type}_trial={trial}_'
+        sel_func = rand_subset_selection
+        sel_func_param = [0, 200]
+    elif sub_sel_func == 1:
+        filename_prefix = f'{dataset_name}_rand_bal_sub_selection_seq={seq_type}_trial={trial}_'
+        sel_func = rand_subset_selection
+        sel_func_param = [1, 200]
+    elif sub_sel_func == 2:
+        filename_prefix = f'{dataset_name}_rand_greedy_sub_selection_seq={seq_type}_trial={trial}_'
+        sel_func = rand_greedy_subset_selection
+        sel_func_param = [100, 200]
 
     # Class sequence
-    # class_seq = range(0, len(train_set.classes))
-    class_seq = [0, 1, 2, 3, 4]
+    class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
+    class_seq = class_sequences[0] if seq_type == 'high' else class_sequences[1]
 
     test_set_1 = get_class_example_indices(test_set, class_seq[0])
     test_set_1 += get_class_example_indices(test_set, class_seq[1])
@@ -174,7 +193,7 @@ if __name__ == '__main__':
 
             # Run subset selection
             print('\tRunning subset selection...')
-            send_command(rand_subset_selection, seq_num=seq_num, param_list=[balanced, 200], util=util,
+            send_command(sel_func, seq_num=seq_num, param_list=sel_func_param, util=util,
                          data_out=[subset_idxs, predicted_labels])
             seq_num += 1
 
@@ -228,3 +247,5 @@ if __name__ == '__main__':
 
         # Write xml logs to file
         write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
+
+        print('Done!\n')

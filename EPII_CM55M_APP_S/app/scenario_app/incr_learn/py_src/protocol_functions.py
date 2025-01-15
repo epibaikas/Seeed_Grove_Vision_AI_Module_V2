@@ -178,6 +178,42 @@ def rand_subset_selection(param_list, data_out, util):
 
     return 0
 
+
+def rand_greedy_subset_selection(param_list, data_out, util):
+    if len(param_list) != 2:
+        raise AssertionError('Incorrect param_list length')
+
+    num_iter = param_list[0]
+    num_per_line = param_list[1]
+
+    # debugging ----------------------------------------------
+    # Prints the iterations of the greedy process
+    for i in range(num_iter):
+        resp_line = util['ser'].readline().decode()
+        debug_print(resp_line, end='', debug=util['debug'])
+        util['resp_logger'].info(resp_line.rstrip())
+    # --------------------------------------------------------
+
+    read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
+
+    resp_line = util['ser'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    if resp_line != 'subset_idxs_read_done\r\r\n':
+        raise AssertionError('resp_line not properly received for subset_idxs read')
+
+    read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
+
+    resp_line = util['ser'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    if resp_line != 'predicted_labels_read_done\r\r\n':
+        raise AssertionError('resp_line not properly received for predicted_labels')
+
+    return 0
+
 def write_buffer(data, size, num_per_line, util):
     for i in range(0, size, num_per_line):
         if size - i >= num_per_line:

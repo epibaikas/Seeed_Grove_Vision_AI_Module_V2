@@ -6,7 +6,7 @@ struct FunctionArguments;
 uint16_t* allocate_symmetric_2D_array(uint32_t N);
 void set_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, int32_t j, uint16_t value);
 uint16_t get_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, uint32_t j);
-uint32_t get_symmetric_2D_array_index(uint32_t N, uint32_t i, int32_t j);
+uint32_t get_symmetric_2D_array_index(uint32_t N, uint32_t i, uint32_t j);
 
 uint32_t dot_prod_uint8_vect(uint8_t* pSrcA, uint8_t* pSrcB, uint32_t blockSize);
 
@@ -27,5 +27,9 @@ void update_labels_buffer(struct FunctionArguments *fun_args);
 uint16_t* find_label_indices(uint8_t *labels, uint16_t labels_array_size, uint8_t target_label, uint32_t *target_label_count);
 uint8_t get_num_of_available_classes(uint8_t *labels);
 void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_idxs, uint8_t* predicted_labels);
+float get_avg_class_acc(uint8_t *labels, uint8_t *predicted_labels);
+uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels);
+void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate);
+void float_to_string(float num, char *str, int precision);
 void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args);
 #endif

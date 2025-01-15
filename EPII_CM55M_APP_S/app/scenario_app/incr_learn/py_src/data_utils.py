@@ -20,11 +20,11 @@ def load_dataset(dataset_name, device):
     X_test = test_set.data.type(torch.int32)
     y_test = test_set.targets.type(torch.int8).to(device)
 
-    print('Dataset:', dataset_name)
-    print('X_train shape:', X_train.shape, X_train.dtype)
-    print('y_train shape:', y_train.shape, y_train.dtype)
-    print('X_test shape:', X_test.shape, X_test.dtype)
-    print('y_test shape:', y_test.shape, y_test.dtype, '\n')
+    # print('Dataset:', dataset_name)
+    # print('X_train shape:', X_train.shape, X_train.dtype)
+    # print('y_train shape:', y_train.shape, y_train.dtype)
+    # print('X_test shape:', X_test.shape, X_test.dtype)
+    # print('y_test shape:', y_test.shape, y_test.dtype, '\n')
 
     X_train = torch.reshape(X_train, (X_train.shape[0], -1)).to(device)
     X_test = torch.reshape(X_test, (X_test.shape[0], -1)).to(device)

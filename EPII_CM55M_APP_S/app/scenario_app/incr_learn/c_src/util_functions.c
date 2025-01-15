@@ -34,7 +34,7 @@ uint16_t get_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, u
     return value;
 }
 
-uint32_t get_symmetric_2D_array_index(uint32_t N, uint32_t i, int32_t j) {
+uint32_t get_symmetric_2D_array_index(uint32_t N, uint32_t i, uint32_t j) {
         if (i > j) {
         // Because of symmetry: A[i][j] == A[j][i], so swap i and j
         uint32_t temp = i;
@@ -139,6 +139,8 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs) {
             }
             idx += num_of_class_examples_in_subset;
          }
+
+        free(label_idxs);
     }
 
     // uint16_t *label_counts = (uint16_t *)calloc(NUM_OF_CLASSES, sizeof(uint16_t));
@@ -395,6 +397,144 @@ void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_
 
     free(temp_dist_buf);
     free(indices);
+}
+
+float get_avg_class_acc(uint8_t *labels, uint8_t *predict_labels) {
+    uint16_t *label_idxs;
+    uint32_t target_label_count = 0;
+    uint32_t num_correct = 0;
+
+    uint8_t num_of_available_classes = 0;
+    float acc_sum = 0.0;
+    float avg_acc = 0.0;
+
+    for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
+        // Get the indices of the examples belonging to the target class
+        label_idxs = find_label_indices(labels, NUM_OF_IMGS_TOTAL, i, &target_label_count);
+        
+        num_correct = 0;
+        for (uint32_t j = 0; j < target_label_count; j++) {
+            if (predict_labels[label_idxs[j]] == labels[label_idxs[j]]) {
+                num_correct++;
+            }
+        }
+        
+        if (target_label_count > 0) {
+            num_of_available_classes++;
+            acc_sum += num_correct / (float) target_label_count;
+        }
+        
+        free(label_idxs);
+    }
+
+    avg_acc = acc_sum / (float) num_of_available_classes;
+    return avg_acc;
+}
+
+uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels) {
+    uint32_t num_correct = 0;
+    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+        if (labels[i] == predicted_labels[i]) {
+            num_correct++;
+        }
+    }
+
+    return num_correct;
+}
+
+void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate) {    
+    int idx = 0;
+    uint32_t num_of_idxs_to_be_mutated = floor(mutation_rate * NUM_OF_IMGS_IN_EEPROM_BUFFER);
+
+    if (num_of_idxs_to_be_mutated > NUM_OF_IMGS_IN_RAM_BUFFER) {
+        xprintf("mutation error: num_of_idxs_to_be_mutated is greater than available indices");
+        exit(1);
+    }
+
+    uint8_t* in_subset = calloc(NUM_OF_IMGS_TOTAL, sizeof(uint8_t));
+    uint16_t* idxs_not_in_subset = calloc(NUM_OF_IMGS_IN_RAM_BUFFER, sizeof(uint16_t));
+    uint8_t* idxs_mutated = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint8_t));
+
+    if (in_subset == NULL || idxs_not_in_subset == NULL || idxs_mutated == NULL) {
+        xprintf("mem_error: memory allocation for in_subset, idxs_not_in_subset or idxs_mutated failed\r\n");
+		exit(1);
+    }
+    
+    shuffle(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER);
+
+    // Turn subset_idxs into 0-1 bitstream format
+    for (int i = 0; i < NUM_OF_IMGS_IN_EEPROM_BUFFER; i++) {
+        in_subset[subset_idxs[i]] = 1;
+    }
+
+    // Get the example idxs that are not in the subset
+    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+        if (in_subset[i] == 0) {
+            idxs_not_in_subset[idx] = i;
+            idx++;
+        }
+    }
+    
+    shuffle(idxs_not_in_subset, NUM_OF_IMGS_IN_RAM_BUFFER);
+    
+    uint8_t label = 0;
+    bool mutation_complete = false;
+    // Apply mutation
+    for (int i = 0; i < num_of_idxs_to_be_mutated; i++) {
+      // Get label of i-th example from idxs_not_in_subset
+      label = labels[idxs_not_in_subset[i]];
+
+      idx = 0;
+      mutation_complete = false;
+      // Find the first idx within subset_idxs that has the same label and hasn't already been mutated 
+      while (mutation_complete == false && idx < NUM_OF_IMGS_IN_EEPROM_BUFFER) {
+        if (label == labels[subset_idxs[idx]] && idxs_mutated[idx] != 1) {
+          subset_idxs[idx] = idxs_not_in_subset[i];
+          idxs_mutated[idx] = 1;
+          mutation_complete = true;
+        }
+        
+        idx++;
+      }
+
+    }
+
+    free(in_subset);
+    free(idxs_not_in_subset);
+    free(idxs_mutated);
+}
+
+void float_to_string(float num, char *str, int precision) {
+    // Handle negative numbers
+    int is_negative = 0;
+    if (num < 0) {
+        is_negative = 1;
+        num = -num;
+    }
+
+    // Extract integer part
+    int int_part = (int)num;
+    float fraction_part = num - int_part;
+
+    // Scale fractional part to desired precision
+    for (int i = 0; i < precision; i++) {
+        fraction_part *= 10;
+    }
+    int fractional_int = (int)(fraction_part + 0.5); // Round to nearest integer
+
+    // Convert integer part to string
+    char int_str[20], frac_str[20];
+    sprintf(int_str, "%d", int_part);
+
+    // Convert fractional part to string
+    sprintf(frac_str, "%0*d", precision, fractional_int);
+
+    // Combine integer and fractional parts
+    if (is_negative) {
+        sprintf(str, "-%s.%s", int_str, frac_str);
+    } else {
+        sprintf(str, "%s.%s", int_str, frac_str);
+    }
 }
 
 void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args) {
