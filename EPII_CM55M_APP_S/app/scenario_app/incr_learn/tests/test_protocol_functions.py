@@ -10,6 +10,12 @@ def test_set_random_seed(seq_num, config, util):
     increment_seq_num(seq_num)
     assert command_return_value == 0
 
+def test_set_data_buffer_parameters(seq_num, config, util):
+    command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num['value'],
+                                        param_list=[config['N_RAM_BUFFER'], config['N_EEPROM_BUFFER'],
+                                                    config['bytes_per_img']], util=util)
+    increment_seq_num(seq_num)
+    assert command_return_value == 0
 
 def test_write_read_ram_buffer(seq_num, config, img_data, util, data_read_buffer):
     for i in range(config['N_RAM_BUFFER']):

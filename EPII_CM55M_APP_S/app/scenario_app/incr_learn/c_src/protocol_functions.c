@@ -20,7 +20,7 @@ void write_ram_buffer(struct FunctionArguments *fun_args) {
     }
 
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
-    write_buffer(&(fun_args->ram_buffer[example_num][0]), BYTES_PER_IMG, num_per_line);
+    write_buffer(&(fun_args->ram_buffer[example_num][0]), fun_args->bytes_per_example, num_per_line);
 }
 
 void read_ram_buffer(struct FunctionArguments *fun_args) {
@@ -36,7 +36,7 @@ void read_ram_buffer(struct FunctionArguments *fun_args) {
 
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
-    read_buffer(&(fun_args->ram_buffer[example_num][0]), BYTES_PER_IMG, sizeof(uint8_t), num_per_line);
+    read_buffer(&(fun_args->ram_buffer[example_num][0]), fun_args->bytes_per_example, sizeof(uint8_t), num_per_line);
 }
 
 void write_eeprom(struct FunctionArguments *fun_args) {
@@ -56,13 +56,13 @@ void write_eeprom(struct FunctionArguments *fun_args) {
 
     // Determine flash_sector_num based on example_num
     int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = FLASH_BASE_ADDRESS;
+    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
     int flash_sector_idx = 0;
 
-    get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
+    get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
 
     // Read contents from flash sector to eeprom_sector_buffer 
-	hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), FLASH_SECTOR_SIZE);
+	hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE);
 
     // Erase flash sector
     hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, flash_sector_start_addr, FLASH_SECTOR);
@@ -70,10 +70,10 @@ void write_eeprom(struct FunctionArguments *fun_args) {
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
     // Write new data to eeprom_sector_buffer
-    write_buffer(&(fun_args->eeprom_sector_buffer[flash_sector_idx]), BYTES_PER_IMG, num_per_line);
+    write_buffer(&(fun_args->eeprom_sector_buffer[flash_sector_idx]), fun_args->bytes_per_example, num_per_line);
 
     // Write data in eeprom_sector_buffer to flash
-    hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), FLASH_SECTOR_SIZE, 0);
+    hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE, 0);
 }
 
 void read_eeprom(struct FunctionArguments *fun_args) {
@@ -95,14 +95,14 @@ void read_eeprom(struct FunctionArguments *fun_args) {
 
     // Determine flash_sector_num based on example_num
     int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = FLASH_BASE_ADDRESS;
+    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
     int flash_sector_idx = 0;
 
-    get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
+    get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
 
     // Read data to eeprom_buffer from flash
-    hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), BYTES_PER_IMG);
-    read_buffer(&(fun_args->eeprom_buffer[0]), BYTES_PER_IMG, sizeof(uint8_t), num_per_line);
+    hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), fun_args->bytes_per_example);
+    read_buffer(&(fun_args->eeprom_buffer[0]), fun_args->bytes_per_example, sizeof(uint8_t), num_per_line);
 }
 
 void read_labels_buffer(struct FunctionArguments *fun_args) {
@@ -118,7 +118,7 @@ void read_labels_buffer(struct FunctionArguments *fun_args) {
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
     update_labels_buffer(fun_args);
-    read_buffer(&(fun_args->labels[0]), NUM_OF_IMGS_TOTAL, sizeof(uint8_t), num_per_line);
+    read_buffer(&(fun_args->labels[0]), fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
 }
 
 void compute_dist_matrix(struct FunctionArguments *fun_args) {
@@ -126,81 +126,81 @@ void compute_dist_matrix(struct FunctionArguments *fun_args) {
 
     int example_num = 0;
     int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = FLASH_BASE_ADDRESS;
+    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
     int flash_sector_idx = 0;
 
-    uint32_t *self_dot_prod = calloc(NUM_OF_IMGS_TOTAL, sizeof(uint32_t));
+    uint32_t *self_dot_prod = calloc(fun_args->num_examples_total, sizeof(uint32_t));
     if (self_dot_prod == NULL) {
 		xprintf("mem_error: memory allocation for self_dot_prod buffer failed\r\n");
 		exit(1);
 	}
 
     // Compute self-dot products
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
-        if (i < NUM_OF_IMGS_IN_RAM_BUFFER)
-            self_dot_prod[i] = dot_prod_uint8_vect(fun_args->ram_buffer[i], fun_args->ram_buffer[i], DATA_BYTES_PER_IMG);
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
+        if (i < fun_args->ram_buffer_size)
+            self_dot_prod[i] = dot_prod_uint8_vect(fun_args->ram_buffer[i], fun_args->ram_buffer[i], fun_args->data_bytes_per_example);
         else {
             // Read data to eeprom_buffer from flash
-            example_num = i - NUM_OF_IMGS_IN_RAM_BUFFER;
-            get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
-            hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), DATA_BYTES_PER_IMG);
+            example_num = i - fun_args->ram_buffer_size;
+            get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
+            hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), fun_args->data_bytes_per_example);
             
-            self_dot_prod[i] = dot_prod_uint8_vect(&(fun_args->eeprom_buffer[0]), &(fun_args->eeprom_buffer[0]), DATA_BYTES_PER_IMG);
+            self_dot_prod[i] = dot_prod_uint8_vect(&(fun_args->eeprom_buffer[0]), &(fun_args->eeprom_buffer[0]), fun_args->data_bytes_per_example);
         }
         // xprintf("self_dot_prod[%u] = %u\r\n", i, self_dot_prod[i]);
     }
 
     // Compute distances
     uint32_t dist = 0;
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
-        for (int j = i + 1; j < NUM_OF_IMGS_TOTAL; j++) {
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
+        for (int j = i + 1; j < fun_args->num_examples_total; j++) {
             dist = self_dot_prod[i] + self_dot_prod[j];            
-            if (i < NUM_OF_IMGS_IN_RAM_BUFFER && j < NUM_OF_IMGS_IN_RAM_BUFFER) {
-                dist -= 2 * dot_prod_uint8_vect(fun_args->ram_buffer[i], fun_args->ram_buffer[j], DATA_BYTES_PER_IMG);
-                // xprintf("Cond 1 ");
+            if (i < fun_args->ram_buffer_size && j < fun_args->ram_buffer_size) {
+                dist -= 2 * dot_prod_uint8_vect(fun_args->ram_buffer[i], fun_args->ram_buffer[j], fun_args->data_bytes_per_example);
+                // xprintf("i = %d, j = %d, Cond 1\r\n", i, j);
             }
 
-            if (i >= NUM_OF_IMGS_IN_RAM_BUFFER && j < NUM_OF_IMGS_IN_RAM_BUFFER) {
-                example_num = i - NUM_OF_IMGS_IN_RAM_BUFFER;
-                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
-                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), DATA_BYTES_PER_IMG);
+            if (i >= fun_args->ram_buffer_size && j < fun_args->ram_buffer_size) {
+                example_num = i - fun_args->ram_buffer_size;
+                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
+                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), fun_args->data_bytes_per_example);
 
-                dist -= 2 * dot_prod_uint8_vect(&(fun_args->eeprom_buffer[0]), fun_args->ram_buffer[j], DATA_BYTES_PER_IMG);
-                // xprintf("Cond 2 ");
+                dist -= 2 * dot_prod_uint8_vect(&(fun_args->eeprom_buffer[0]), fun_args->ram_buffer[j], fun_args->data_bytes_per_example);
+                // xprintf("i = %d, j = %d, Cond 2\r\n", i, j);
             }
 
-            if (i < NUM_OF_IMGS_IN_RAM_BUFFER && j >= NUM_OF_IMGS_IN_RAM_BUFFER) {
-                example_num = j - NUM_OF_IMGS_IN_RAM_BUFFER;
-                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
-                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), DATA_BYTES_PER_IMG);
+            if (i < fun_args->ram_buffer_size && j >= fun_args->ram_buffer_size) {
+                example_num = j - fun_args->ram_buffer_size;
+                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
+                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), fun_args->data_bytes_per_example);
 
-                dist -= 2 * dot_prod_uint8_vect(fun_args->ram_buffer[i], &(fun_args->eeprom_buffer[0]), DATA_BYTES_PER_IMG);
-                // xprintf("Cond 3 ");
+                dist -= 2 * dot_prod_uint8_vect(fun_args->ram_buffer[i], &(fun_args->eeprom_buffer[0]), fun_args->data_bytes_per_example);
+                // xprintf("i = %d, j = %d, Cond 3\r\n", i, j);
             }
 
-            if (i >= NUM_OF_IMGS_IN_RAM_BUFFER && j >= NUM_OF_IMGS_IN_RAM_BUFFER) {
-                example_num = i - NUM_OF_IMGS_IN_RAM_BUFFER;
-                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
-                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), DATA_BYTES_PER_IMG);
+            if (i >= fun_args->ram_buffer_size && j >= fun_args->ram_buffer_size) {
+                example_num = i - fun_args->ram_buffer_size;
+                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
+                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer[0]), fun_args->data_bytes_per_example);
 
-                example_num = j - NUM_OF_IMGS_IN_RAM_BUFFER;
-                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
-                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer_2[0]), DATA_BYTES_PER_IMG);
+                example_num = j - fun_args->ram_buffer_size;
+                get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
+                hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx, &(fun_args->eeprom_buffer_2[0]), fun_args->data_bytes_per_example);
 
-                dist -= 2 * dot_prod_uint8_vect(&(fun_args->eeprom_buffer[0]), &(fun_args->eeprom_buffer_2[0]), DATA_BYTES_PER_IMG);
-                // xprintf("Cond 4 ");
+                dist -= 2 * dot_prod_uint8_vect(&(fun_args->eeprom_buffer[0]), &(fun_args->eeprom_buffer_2[0]), fun_args->data_bytes_per_example);
+                // xprintf("i = %d, j = %d, Cond 4\r\n", i, j);
             }
 
-            // xprintf("%010u ", dist);
-            set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), NUM_OF_IMGS_TOTAL, i, j, dist >> 12);
-            // xprintf("%010u ", get_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), NUM_OF_IMGS_TOTAL, i, j));
+            // xprintf("i = %d, j = %d, %010u ", i, j, dist >> 12);
+            set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->num_examples_total, i, j, dist >> 12);
+            // xprintf("%010u \r\n", get_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->num_examples_total, i, j));
         }
         // xprintf("\r\n");
     }
 
     // Set every cell on the diagonal equal to 0xFFFF
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
-        set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), NUM_OF_IMGS_TOTAL, i, i, 0xFFFF);
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
+        set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->num_examples_total, i, i, 0xFFFF);
     }
 
     free(self_dot_prod);
@@ -219,7 +219,7 @@ void read_dist_matrix(struct FunctionArguments *fun_args) {
 
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
-    uint32_t N = NUM_OF_IMGS_TOTAL;
+    uint32_t N = fun_args->num_examples_total;
     uint32_t size = (N * (N + 1)) / 2;
 
     read_buffer(&(fun_args->dist_matrix[0]), size, sizeof(uint16_t), num_per_line);
@@ -239,8 +239,8 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
     // Generate subset
-    uint16_t* subset_idxs = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
-    uint8_t* predicted_labels = calloc(NUM_OF_IMGS_TOTAL, sizeof(uint8_t));
+    uint16_t* subset_idxs = calloc(fun_args->eeprom_buffer_size, sizeof(uint16_t));
+    uint8_t* predicted_labels = calloc(fun_args->num_examples_total, sizeof(uint8_t));
     if (subset_idxs == NULL || predicted_labels == NULL) {
         xprintf("mem_error: memory allocation for subset_idxs or predicted_labels failed\r\n");
 		exit(1);
@@ -250,22 +250,22 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     update_labels_buffer(fun_args);
     
     if (balanced_subset == 1) {
-        get_random_bal_subset(fun_args->labels, subset_idxs);
+        get_random_bal_subset(fun_args->labels, subset_idxs, fun_args);
     } else {
-        get_random_subset(NUM_OF_IMGS_IN_EEPROM_BUFFER, NUM_OF_IMGS_TOTAL, subset_idxs);
+        get_random_subset(fun_args->eeprom_buffer_size, fun_args->num_examples_total, subset_idxs);
     }
 
     // Classify all examples using the subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
 
     // Output generated subset and label predictions
-    read_buffer(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), num_per_line);
+    read_buffer(subset_idxs, fun_args->eeprom_buffer_size, sizeof(uint16_t), num_per_line);
     xprintf("subset_idxs_read_done\r\n");
-    read_buffer(predicted_labels, NUM_OF_IMGS_TOTAL, sizeof(uint8_t), num_per_line);
+    read_buffer(predicted_labels, fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
     xprintf("predicted_labels_read_done\r\n");
 
     // Move subset data examples located in RAM to EEPROM
-    move_subset_to_eeprom(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, fun_args);
+    move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
 
     free(subset_idxs);
     free(predicted_labels);
@@ -292,9 +292,9 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
     // Allocate memory
-    uint16_t* candidate_subset_idxs = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
-    uint16_t* subset_idxs = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
-    uint8_t* predicted_labels = calloc(NUM_OF_IMGS_TOTAL, sizeof(uint8_t));
+    uint16_t* candidate_subset_idxs = calloc(fun_args->eeprom_buffer_size, sizeof(uint16_t));
+    uint16_t* subset_idxs = calloc(fun_args->eeprom_buffer_size, sizeof(uint16_t));
+    uint8_t* predicted_labels = calloc(fun_args->num_examples_total, sizeof(uint8_t));
     if (candidate_subset_idxs == NULL || subset_idxs == NULL || predicted_labels == NULL) {
         xprintf("mem_error: memory allocation for candidate_subset_idxs, subset_idxs or predicted_labels failed\r\n");
 		exit(1);
@@ -304,7 +304,7 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     update_labels_buffer(fun_args);
 
     // Generate initial random balanced subset
-    get_random_bal_subset(fun_args->labels, subset_idxs);
+    get_random_bal_subset(fun_args->labels, subset_idxs, fun_args);
 
     // Classify all examples using the subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
@@ -312,22 +312,22 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     // uint32_t num_correct = get_num_correct_pred(fun_args->labels, predicted_labels);
     // xprintf("num_correct = %u\r\n", num_correct);
 
-    max_avg_class_acc = get_avg_class_acc(fun_args->labels, predicted_labels);
+    max_avg_class_acc = get_avg_class_acc(fun_args->labels, predicted_labels, fun_args);
     float_to_string(max_avg_class_acc, max_avg_class_acc_str, 4);
 
     for (int i = 0; i < num_iter; i++) {
-        memcpy(candidate_subset_idxs, subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER * sizeof(uint16_t));
-        mutate_bal_subset(candidate_subset_idxs, fun_args->labels, mutation_rate);
+        memcpy(candidate_subset_idxs, subset_idxs, fun_args->eeprom_buffer_size * sizeof(uint16_t));
+        mutate_bal_subset(candidate_subset_idxs, fun_args->labels, mutation_rate, fun_args);
 
         classify_training_set(fun_args, candidate_subset_idxs, predicted_labels);
 
-        avg_class_acc = get_avg_class_acc(fun_args->labels, predicted_labels);
+        avg_class_acc = get_avg_class_acc(fun_args->labels, predicted_labels, fun_args);
         float_to_string(avg_class_acc, avg_class_acc_str, 4);
 
         xprintf("iter = %d, avg_class_acc = %s, max_avg_class_acc = %s \r\n", i, avg_class_acc_str, max_avg_class_acc_str);
 
         if (avg_class_acc > max_avg_class_acc) {
-            memcpy(subset_idxs, candidate_subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER * sizeof(uint16_t));
+            memcpy(subset_idxs, candidate_subset_idxs, fun_args->eeprom_buffer_size * sizeof(uint16_t));
             max_avg_class_acc = avg_class_acc;
             float_to_string(max_avg_class_acc, max_avg_class_acc_str, 4);
         }
@@ -337,17 +337,83 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     classify_training_set(fun_args, subset_idxs, predicted_labels);
 
     // Output generated subset and label predictions
-    read_buffer(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), num_per_line);
+    read_buffer(subset_idxs, fun_args->eeprom_buffer_size, sizeof(uint16_t), num_per_line);
     xprintf("subset_idxs_read_done\r\n");
-    read_buffer(predicted_labels, NUM_OF_IMGS_TOTAL, sizeof(uint8_t), num_per_line);
+    read_buffer(predicted_labels, fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
     xprintf("predicted_labels_read_done\r\n");
 
     // Move subset data examples located in RAM to EEPROM
-    move_subset_to_eeprom(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER, fun_args);
+    move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
 
     free(subset_idxs);
     free(candidate_subset_idxs);
     free(predicted_labels);
+}
+
+void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
+    uint32_t ram_buffer_size;
+    uint32_t eeprom_buffer_size;
+    uint32_t bytes_per_example;
+    int sscanf_ret_value = 0;
+
+    sscanf_ret_value = sscanf(fun_args->param, "%u %u %u", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example);
+    if (sscanf_ret_value <= 0) {
+        xprintf("ack_error: set_data_buffer_parameters() parameters not parsed correctly\r\n");
+        exit(1);
+    }
+
+    xprintf("ack_begin %d\r\n", fun_args->seq_num);
+
+    fun_args->ram_buffer_size = ram_buffer_size;
+    fun_args->eeprom_buffer_size = eeprom_buffer_size;
+    fun_args->num_examples_total = ram_buffer_size + eeprom_buffer_size;
+    fun_args->bytes_per_example = bytes_per_example;
+    fun_args->data_bytes_per_example = bytes_per_example - 1;
+    fun_args->examples_per_eeprom_sector = EEPROM_SECTOR_SIZE / bytes_per_example;
+
+    // Allocate memory for RAM buffer
+	uint8_t **ram_buffer = (uint8_t **)calloc(fun_args->ram_buffer_size, sizeof(uint8_t *));
+	if (ram_buffer == NULL) {
+		xprintf("mem_error: memory allocation for ram_buffer failed\r\n");
+		exit(1);
+	}
+
+	for (int i = 0; i < fun_args->ram_buffer_size; i++) {
+		ram_buffer[i] = (uint8_t *)calloc(fun_args->bytes_per_example, sizeof(uint8_t));
+		if (ram_buffer[i] == NULL) {
+			xprintf("mem_error: memory allocation for ram_buffer[%d] failed\r\n", i);
+			exit(1);
+		}
+	}
+
+	// Allocate memory for distance matrix
+	uint16_t* dist_matrix = allocate_symmetric_2D_array(fun_args->num_examples_total);
+
+	// Create eeprom buffers;
+	uint8_t* labels = (uint8_t *)calloc(fun_args->num_examples_total, sizeof(uint8_t));
+    
+    if (labels == NULL) {
+		xprintf("mem_error: memory allocation for labels buffer failed\r\n");
+		exit(1);
+	}
+
+	fun_args->ram_buffer = ram_buffer;
+	fun_args->dist_matrix = dist_matrix;
+	fun_args->labels = labels;
+
+    xprintf("ram_buffer_size: %u\r\n", fun_args->ram_buffer_size);
+    xprintf("eeprom_buffer_size: %u\r\n", fun_args->eeprom_buffer_size);
+    xprintf("num_examples_total: %u\r\n", fun_args->num_examples_total);
+    xprintf("bytes_per_example: %u\r\n", fun_args->bytes_per_example);
+    xprintf("data_bytes_per_example: %u\r\n", fun_args->data_bytes_per_example);
+    xprintf("examples_per_eeprom_sector: %u\r\n", fun_args->examples_per_eeprom_sector);
+
+	xprintf("Addr of dist_matrix: 0x%08x\r\n", fun_args->dist_matrix);
+	xprintf("Addr of eeprom_buffer: 0x%08x\r\n", fun_args->eeprom_buffer);
+	xprintf("Addr of eeprom_buffer_2: 0x%08x\r\n", fun_args->eeprom_buffer_2);
+	xprintf("Addr of eeprom_sector_buffer: 0x%08x\r\n", fun_args->eeprom_sector_buffer);
+	xprintf("Addr of labels buffer: 0x%08x\r\n", fun_args->labels);
+	xprintf("RAND_MAX: 0x%08x\r\n", RAND_MAX);    
 }
 
 void set_random_seed(struct FunctionArguments *fun_args) {
@@ -384,11 +450,13 @@ function_pointer lookup_function(char *command_name) {
     } else if (strncmp(command_name, "read_dist_matrix", 17) == 0) {
         return &read_dist_matrix;
     } else if (strncmp(command_name, "rand_subset_selection", 22) == 0) {
-       return &rand_subset_selection;
+        return &rand_subset_selection;
     } else if (strncmp(command_name, "rand_greedy_subset_selection", 29) == 0) {
         return &rand_greedy_subset_selection;
     } else if (strncmp(command_name, "set_random_seed", 16) == 0) {
-       return &set_random_seed;
+        return &set_random_seed;
+    } else if (strncmp(command_name, "set_data_buffer_parameters", 27) == 0) {
+        return &set_data_buffer_parameters;
     } else {
         xprintf("ack_error: command_name not recognised\r\n");
         xprintf("command_name %s\r\n", command_name);

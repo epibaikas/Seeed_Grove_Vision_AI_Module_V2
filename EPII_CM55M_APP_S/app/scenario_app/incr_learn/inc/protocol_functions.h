@@ -4,6 +4,13 @@
 struct FunctionArguments {
   int seq_num;
   char *param;
+  uint32_t ram_buffer_size;
+  uint32_t eeprom_buffer_size;
+  uint32_t num_examples_total;
+  uint32_t bytes_per_example;
+  uint32_t data_bytes_per_example;
+  int examples_per_eeprom_sector;
+
   uint8_t **ram_buffer;
   uint8_t *eeprom_buffer;
   uint8_t *eeprom_buffer_2;
@@ -24,7 +31,9 @@ void read_labels_buffer(struct FunctionArguments *fun_args);
 void compute_dist_matrix(struct FunctionArguments *fun_args);
 void read_dist_matrix(struct FunctionArguments *fun_args);
 void rand_subset_selection(struct FunctionArguments *fun_args);
+void rand_greedy_subset_selection(struct FunctionArguments *fun_args);
 
+void set_data_buffer_parameters(struct FunctionArguments *fun_args);
 void set_random_seed(struct FunctionArguments *fun_args);
 
 function_pointer lookup_function(char *command_name);

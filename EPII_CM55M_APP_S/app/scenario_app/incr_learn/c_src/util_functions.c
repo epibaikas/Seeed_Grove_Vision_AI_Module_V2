@@ -23,7 +23,7 @@ uint16_t* allocate_symmetric_2D_array(uint32_t N) {
     return array;
 }
 
-void set_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, int32_t j, uint16_t value) {
+void set_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, uint32_t j, uint16_t value) {
     uint32_t index = get_symmetric_2D_array_index(N, i, j);
     array[index] = value;
 }
@@ -111,21 +111,21 @@ void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs) {
     free(idx_array);
 }
 
-void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs) {
+void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct FunctionArguments *fun_args) {
     uint32_t target_label_count = 0;
     uint16_t *label_idxs;
     int idx = 0;
 
     // Get the same number of examples from every class
-    uint8_t num_of_available_classes = get_num_of_available_classes(labels);
-    int num_of_class_examples_in_subset = ceil(NUM_OF_IMGS_IN_EEPROM_BUFFER / (float) num_of_available_classes);
+    uint8_t num_of_available_classes = get_num_of_available_classes(labels, fun_args);
+    int num_of_class_examples_in_subset = ceil(fun_args->eeprom_buffer_size / (float) num_of_available_classes);
     
     // xprintf("num_of_available_classes: %u\n\r", num_of_available_classes);
     // xprintf("num_of_class_examples_in_subset: %d\n\r", num_of_class_examples_in_subset);
 
     for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
         // Get the indices of the examples belonging to the target class
-        label_idxs = find_label_indices(labels, NUM_OF_IMGS_TOTAL, i, &target_label_count);
+        label_idxs = find_label_indices(labels, fun_args->num_examples_total, i, &target_label_count);
          
 
          if (label_idxs != NULL) {
@@ -134,7 +134,7 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs) {
 
             // Place the example indices to the subset
             // Check that you are not exceeding the size of the subset_idxs array
-            for (int j = 0; (j < num_of_class_examples_in_subset) && (idx + j < NUM_OF_IMGS_IN_EEPROM_BUFFER); j++) {
+            for (int j = 0; (j < num_of_class_examples_in_subset) && (idx + j < fun_args->eeprom_buffer_size); j++) {
                 subset_idxs[idx + j] = label_idxs[j];
             }
             idx += num_of_class_examples_in_subset;
@@ -149,7 +149,7 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs) {
 	// 	exit(1);
     // }
     
-    // for (int i = 0; i < NUM_OF_IMGS_IN_EEPROM_BUFFER; i++) {
+    // for (int i = 0; i < fun_args->eeprom_buffer_size; i++) {
     //     label_counts[labels[subset_idxs[i]]]++;
     // }
 
@@ -210,11 +210,11 @@ uint8_t find_max_index(uint8_t *array, size_t size) {
     return max_index;
 }
 
-void get_example_flash_addr(int example_num, int* flash_sector_num, uint32_t* flash_sector_start_addr, int* flash_sector_idx) {
-    *flash_sector_num = example_num / EXAMPLES_PER_FLASH_SECTOR;
+void get_example_flash_addr(int example_num, int* flash_sector_num, uint32_t* flash_sector_start_addr, int* flash_sector_idx, struct FunctionArguments *fun_args) {
+    *flash_sector_num = example_num / fun_args->examples_per_eeprom_sector;
 
-    *flash_sector_start_addr = FLASH_BASE_ADDRESS + (FLASH_SECTOR_SIZE * (uint32_t)(*flash_sector_num));
-    *flash_sector_idx = (example_num % EXAMPLES_PER_FLASH_SECTOR) * BYTES_PER_IMG;
+    *flash_sector_start_addr = EEPROM_BASE_ADDRESS + (EEPROM_SECTOR_SIZE * (uint32_t)(*flash_sector_num));
+    *flash_sector_idx = (example_num % fun_args->examples_per_eeprom_sector) * fun_args->bytes_per_example;
 }
 
 void write_buffer(uint8_t* buffer, uint32_t buffer_size, int num_per_line) {
@@ -289,18 +289,18 @@ void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size, int nu
 void update_labels_buffer(struct FunctionArguments *fun_args) {
     int example_num = 0;
     int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = FLASH_BASE_ADDRESS;
+    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
     int flash_sector_idx = 0;
 
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
-        if (i < NUM_OF_IMGS_IN_RAM_BUFFER) {
-            fun_args->labels[i] = fun_args->ram_buffer[i][BYTES_PER_IMG - 1];
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
+        if (i < fun_args->ram_buffer_size) {
+            fun_args->labels[i] = fun_args->ram_buffer[i][fun_args->bytes_per_example - 1];
         } else {
-            example_num = i - NUM_OF_IMGS_IN_RAM_BUFFER;
-            get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
+            example_num = i - fun_args->ram_buffer_size;
+            get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
 
             // Read only the last byte that contains the label of the examples stored in EEPROM
-            hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx + BYTES_PER_IMG - 1, &(fun_args->eeprom_buffer[0]), 1);
+            hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx + fun_args->bytes_per_example - 1, &(fun_args->eeprom_buffer[0]), 1);
             fun_args->labels[i] = fun_args->eeprom_buffer[0];
         }
     }
@@ -340,7 +340,7 @@ uint16_t* find_label_indices(uint8_t *labels, uint16_t labels_array_size, uint8_
     return label_idxs;
 }
 
-uint8_t get_num_of_available_classes(uint8_t *labels) {
+uint8_t get_num_of_available_classes(uint8_t *labels, struct FunctionArguments *fun_args) {
     uint8_t num_of_available_classes = 0;
     
     uint16_t *label_counts = (uint16_t *)calloc(NUM_OF_CLASSES, sizeof(uint16_t));
@@ -349,7 +349,7 @@ uint8_t get_num_of_available_classes(uint8_t *labels) {
 		exit(1);
     }
     
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
         label_counts[labels[i]]++;
     }
     
@@ -365,29 +365,29 @@ uint8_t get_num_of_available_classes(uint8_t *labels) {
 
 
 void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_idxs, uint8_t* predicted_labels) {
-    uint16_t* temp_dist_buf = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
-    uint16_t* indices = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t));
+    uint16_t* temp_dist_buf = calloc(fun_args->eeprom_buffer_size, sizeof(uint16_t));
+    uint16_t* indices = calloc(fun_args->eeprom_buffer_size, sizeof(uint16_t));
     if (temp_dist_buf == NULL || indices == NULL) {
         xprintf("mem_error: memory allocation for temp_dist_buf or indices failed\r\n");
 		exit(1);
     }
 
 
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
         // Load temporary buffer with the distances between the i-th examples and all the examples in the subset
-        for (int j = 0; j < NUM_OF_IMGS_IN_EEPROM_BUFFER; j++) {
-            temp_dist_buf[j] = get_symmetric_2D_array_value(fun_args->dist_matrix, NUM_OF_IMGS_TOTAL, i, subset_idxs[j]);
+        for (int j = 0; j < fun_args->eeprom_buffer_size; j++) {
+            temp_dist_buf[j] = get_symmetric_2D_array_value(fun_args->dist_matrix, fun_args->num_examples_total, i, subset_idxs[j]);
         }
 
         // Initialise indices buffer
-        for (size_t i = 0; i < NUM_OF_IMGS_IN_EEPROM_BUFFER; i++) {
+        for (size_t i = 0; i < fun_args->eeprom_buffer_size; i++) {
             indices[i] = i;
         }
         // Get the indices that short temp_dist_buf in ascending distance order
-        qsort_r(indices, NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint16_t), (void *) temp_dist_buf, compare_indices);
+        qsort_r(indices, fun_args->eeprom_buffer_size, sizeof(uint16_t), (void *) temp_dist_buf, compare_indices);
 
         // Convert the indices to the corresponding subset_idxs
-        for (int j = 0; j < NUM_OF_IMGS_IN_EEPROM_BUFFER; j++) {
+        for (int j = 0; j < fun_args->eeprom_buffer_size; j++) {
             indices[j] = subset_idxs[indices[j]];
         }
 
@@ -399,7 +399,7 @@ void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_
     free(indices);
 }
 
-float get_avg_class_acc(uint8_t *labels, uint8_t *predict_labels) {
+float get_avg_class_acc(uint8_t *labels, uint8_t *predict_labels, struct FunctionArguments *fun_args) {
     uint16_t *label_idxs;
     uint32_t target_label_count = 0;
     uint32_t num_correct = 0;
@@ -410,7 +410,7 @@ float get_avg_class_acc(uint8_t *labels, uint8_t *predict_labels) {
 
     for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
         // Get the indices of the examples belonging to the target class
-        label_idxs = find_label_indices(labels, NUM_OF_IMGS_TOTAL, i, &target_label_count);
+        label_idxs = find_label_indices(labels, fun_args->num_examples_total, i, &target_label_count);
         
         num_correct = 0;
         for (uint32_t j = 0; j < target_label_count; j++) {
@@ -431,9 +431,9 @@ float get_avg_class_acc(uint8_t *labels, uint8_t *predict_labels) {
     return avg_acc;
 }
 
-uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels) {
+uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels, struct FunctionArguments *fun_args) {
     uint32_t num_correct = 0;
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
         if (labels[i] == predicted_labels[i]) {
             num_correct++;
         }
@@ -442,40 +442,40 @@ uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels) {
     return num_correct;
 }
 
-void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate) {    
+void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, struct FunctionArguments *fun_args) {    
     int idx = 0;
-    uint32_t num_of_idxs_to_be_mutated = floor(mutation_rate * NUM_OF_IMGS_IN_EEPROM_BUFFER);
+    uint32_t num_of_idxs_to_be_mutated = floor(mutation_rate * fun_args->eeprom_buffer_size);
 
-    if (num_of_idxs_to_be_mutated > NUM_OF_IMGS_IN_RAM_BUFFER) {
+    if (num_of_idxs_to_be_mutated > fun_args->ram_buffer_size) {
         xprintf("mutation error: num_of_idxs_to_be_mutated is greater than available indices");
         exit(1);
     }
 
-    uint8_t* in_subset = calloc(NUM_OF_IMGS_TOTAL, sizeof(uint8_t));
-    uint16_t* idxs_not_in_subset = calloc(NUM_OF_IMGS_IN_RAM_BUFFER, sizeof(uint16_t));
-    uint8_t* idxs_mutated = calloc(NUM_OF_IMGS_IN_EEPROM_BUFFER, sizeof(uint8_t));
+    uint8_t* in_subset = calloc(fun_args->num_examples_total, sizeof(uint8_t));
+    uint16_t* idxs_not_in_subset = calloc(fun_args->ram_buffer_size, sizeof(uint16_t));
+    uint8_t* idxs_mutated = calloc(fun_args->eeprom_buffer_size, sizeof(uint8_t));
 
     if (in_subset == NULL || idxs_not_in_subset == NULL || idxs_mutated == NULL) {
         xprintf("mem_error: memory allocation for in_subset, idxs_not_in_subset or idxs_mutated failed\r\n");
 		exit(1);
     }
     
-    shuffle(subset_idxs, NUM_OF_IMGS_IN_EEPROM_BUFFER);
+    shuffle(subset_idxs, fun_args->eeprom_buffer_size);
 
     // Turn subset_idxs into 0-1 bitstream format
-    for (int i = 0; i < NUM_OF_IMGS_IN_EEPROM_BUFFER; i++) {
+    for (int i = 0; i < fun_args->eeprom_buffer_size; i++) {
         in_subset[subset_idxs[i]] = 1;
     }
 
     // Get the example idxs that are not in the subset
-    for (int i = 0; i < NUM_OF_IMGS_TOTAL; i++) {
+    for (int i = 0; i < fun_args->num_examples_total; i++) {
         if (in_subset[i] == 0) {
             idxs_not_in_subset[idx] = i;
             idx++;
         }
     }
     
-    shuffle(idxs_not_in_subset, NUM_OF_IMGS_IN_RAM_BUFFER);
+    shuffle(idxs_not_in_subset, fun_args->ram_buffer_size);
     
     uint8_t label = 0;
     bool mutation_complete = false;
@@ -487,7 +487,7 @@ void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_ra
       idx = 0;
       mutation_complete = false;
       // Find the first idx within subset_idxs that has the same label and hasn't already been mutated 
-      while (mutation_complete == false && idx < NUM_OF_IMGS_IN_EEPROM_BUFFER) {
+      while (mutation_complete == false && idx < fun_args->eeprom_buffer_size) {
         if (label == labels[subset_idxs[idx]] && idxs_mutated[idx] != 1) {
           subset_idxs[idx] = idxs_not_in_subset[i];
           idxs_mutated[idx] = 1;
@@ -544,7 +544,7 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
     // Get the indices of examples in eeprom that will be replaced by examples in RAM
     // Find the index of the first eeprom data example in sorted subset_idxs
     int first_eeprom_idx = 0;
-    while (subset_idxs[first_eeprom_idx] < NUM_OF_IMGS_IN_RAM_BUFFER && first_eeprom_idx < subset_size) {
+    while (subset_idxs[first_eeprom_idx] < fun_args->ram_buffer_size && first_eeprom_idx < subset_size) {
         first_eeprom_idx++;
     }
 
@@ -558,7 +558,7 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
 
     int i = 0;
     int j = first_eeprom_idx;
-    for (uint16_t idx = NUM_OF_IMGS_IN_RAM_BUFFER; idx < NUM_OF_IMGS_TOTAL; idx++) {
+    for (uint16_t idx = fun_args->ram_buffer_size; idx < fun_args->num_examples_total; idx++) {
         if (idx == subset_idxs[j]) {
             j++;
         } else {
@@ -571,27 +571,27 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
 
     int example_num = 0;
     int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = FLASH_BASE_ADDRESS;
+    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
     int flash_sector_idx = 0;
 
     // Replace EEPROM examples that are not in the subset with examples from RAM
     for (int i = 0; i < first_eeprom_idx; i++) {
-        example_num = eeprom_indices_not_in_subset[i] - NUM_OF_IMGS_IN_RAM_BUFFER; // Subtract NUM_OF_IMGS_IN_RAM_BUFFER to change index range to [0, NUM_OF_IMGS_IN_EEPROM - 1]
+        example_num = eeprom_indices_not_in_subset[i] - fun_args->ram_buffer_size; // Subtract fun_args->ram_buffer_size to change index range to [0, NUM_OF_IMGS_IN_EEPROM - 1]
 
         // Determine flash_sector_num based on example_num
-        get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx);
+        get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
 
         // Read contents from flash sector to eeprom_sector_buffer 
-        hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), FLASH_SECTOR_SIZE);
+        hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE);
 
         // Erase flash sector
         hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, flash_sector_start_addr, FLASH_SECTOR);
 
         // Copy the contents of ram_buffer[subset_idxs[i]] to eeprom_sector_buffer
-        memcpy(&(fun_args->eeprom_sector_buffer[flash_sector_idx]),  fun_args->ram_buffer[subset_idxs[i]], BYTES_PER_IMG);
+        memcpy(&(fun_args->eeprom_sector_buffer[flash_sector_idx]),  fun_args->ram_buffer[subset_idxs[i]], fun_args->bytes_per_example);
 
         // Write data in eeprom_sector_buffer to flash
-        hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), FLASH_SECTOR_SIZE, 0);
+        hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE, 0);
     }
 
     free(eeprom_indices_not_in_subset);

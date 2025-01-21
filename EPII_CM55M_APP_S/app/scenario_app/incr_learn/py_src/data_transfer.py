@@ -72,6 +72,10 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[config['random_seed']], util=util)
     seq_num += 1
 
+    command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
+                                        config['N_EEPROM_BUFFER'], config['bytes_per_img']], util=util)
+    seq_num += 1
+
     for i in range(config['N_TOTAL']):
         if i < config['N_RAM_BUFFER']:
             send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util, data_in=img_data[i])
@@ -97,7 +101,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     for i in range(config['N_TOTAL']):
         for j in range(i, config['N_TOTAL']):
             idx = get_symmetric_2D_array_index(dist_array_size, i, j)
-            # print('i={}, j={}, idx={}, {}, {}'.format(i, j, idx, expected_dist_matrix[i, j], dist_array[idx]))
+            print('i={}, j={}, idx={}, {}, {}'.format(i, j, idx, expected_classifier.dists[i, j], dist_array[idx]))
             assert expected_classifier.dists[i, j] == dist_array[idx]
 
     send_command(read_labels_buffer, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=labels_buffer)

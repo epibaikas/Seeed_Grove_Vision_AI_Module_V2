@@ -162,45 +162,16 @@ int app_main(void) {
 	printf("SPI ID info: %u\r\n", id_info);
 	xprintf("Init complete\r\n");
 
-	// Allocate memory for RAM buffer
-	uint8_t **ram_buffer = (uint8_t **)calloc(NUM_OF_IMGS_IN_RAM_BUFFER, sizeof(uint8_t *));
-	if (ram_buffer == NULL) {
-		xprintf("mem_error: memory allocation for ram_buffer failed\r\n");
-		exit(1);
-	}
-
-	for (int i = 0; i < NUM_OF_IMGS_IN_RAM_BUFFER; i++) {
-		ram_buffer[i] = (uint8_t *)calloc(BYTES_PER_IMG, sizeof(uint8_t));
-		if (ram_buffer[i] == NULL) {
-			xprintf("mem_error: memory allocation for ram_buffer[%d] failed\r\n", i);
-			exit(1);
-		}
-	}
-
-	// Allocate memory for distance matrix
-	uint16_t* dist_matrix = allocate_symmetric_2D_array(NUM_OF_IMGS_TOTAL);
-
-	// Create eeprom buffers;
-	static uint8_t eeprom_buffer[BYTES_PER_IMG] = {0};
-	static uint8_t eeprom_buffer_2[BYTES_PER_IMG] = {0};
-	static uint8_t eeprom_sector_buffer[FLASH_SECTOR_SIZE] = {0};
-	static uint8_t labels[NUM_OF_IMGS_TOTAL] = {0};
+	// Create eeprom temporary buffers;
+	static uint8_t eeprom_buffer[EEPROM_TEMP_BUFFER_SIZE] = {0};
+	static uint8_t eeprom_buffer_2[EEPROM_TEMP_BUFFER_SIZE] = {0};
+	static uint8_t eeprom_sector_buffer[EEPROM_SECTOR_SIZE] = {0};
 
 	struct FunctionArguments fun_args;
-	fun_args.ram_buffer = ram_buffer;
 	fun_args.eeprom_buffer = eeprom_buffer;
 	fun_args.eeprom_buffer_2 = eeprom_buffer_2;
 	fun_args.eeprom_sector_buffer = eeprom_sector_buffer;
-	fun_args.dist_matrix = dist_matrix;
-	fun_args.labels = labels;
 	fun_args.random_seed = 1;
-
-	xprintf("Addr of dist_matrix: 0x%08x\r\n", dist_matrix);
-	xprintf("Addr of eeprom_buffer: 0x%08x\r\n", eeprom_buffer);
-	xprintf("Addr of eeprom_buffer_2: 0x%08x\r\n", eeprom_buffer_2);
-	xprintf("Addr of eeprom_sector_buffer: 0x%08x\r\n", eeprom_sector_buffer);
-	xprintf("Addr of labels buffer: 0x%08x\r\n", labels);
-	xprintf("RAND_MAX: 0x%08x\r\n", RAND_MAX);
 
 	xprintf("Board initialisation complete\r\n");
 	//-----------------------------------------------------

@@ -249,6 +249,18 @@ def read_buffer(array, size, num_per_line, util):
         util['ser'].write(ack_msg.encode())
         util['req_logger'].debug(ack_msg)
 
+
+def set_data_buffer_parameters(param_list, util):
+    if len(param_list) != 3:
+        raise AssertionError('Incorrect param_list length')
+
+    for i in range(12):
+        resp_line = util['ser'].readline().decode()
+        debug_print(resp_line, end='', debug=util['debug'])
+        util['resp_logger'].info(resp_line.rstrip())
+
+    return 0
+
 def set_random_seed(param_list, util):
     if len(param_list) != 1:
         raise AssertionError('Incorrect param_list length')
