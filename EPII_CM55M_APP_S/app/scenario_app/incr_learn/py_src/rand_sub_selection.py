@@ -78,18 +78,19 @@ if __name__ == '__main__':
     train_data[:, 0:config['data_bytes_per_img']] = X_train.astype(np.uint8)
     train_data[:, config['data_bytes_per_img']] = y_train.astype(np.uint8)
 
+    exp_param = f'seq={seq_type}_ram_buf_size={config["N_RAM_BUFFER"]}_eeprom_buf_size={config["N_EEPROM_BUFFER"]}_'
     if sub_sel_func == 0:
-        filename_prefix = f'{dataset_name}_rand_sub_selection_seq={seq_type}_trial={trial}_'
+        filename_prefix = f'{dataset_name}_rand_sub_selection_' + exp_param + f'trial={trial}_'
         sel_func = rand_subset_selection
         sel_func_param = [0, 200]
     elif sub_sel_func == 1:
-        filename_prefix = f'{dataset_name}_rand_bal_sub_selection_seq={seq_type}_trial={trial}_'
+        filename_prefix = f'{dataset_name}_rand_bal_sub_selection_' + exp_param + f'trial={trial}_'
         sel_func = rand_subset_selection
         sel_func_param = [1, 200]
     elif sub_sel_func == 2:
-        filename_prefix = f'{dataset_name}_rand_greedy_sub_selection_seq={seq_type}_trial={trial}_'
+        filename_prefix = f'{dataset_name}_rand_greedy_sub_selection_' + exp_param + f'num_iter={config["num_iter"]}_trial={trial}_'
         sel_func = rand_greedy_subset_selection
-        sel_func_param = [100, 200]
+        sel_func_param = [config['num_iter'], 200]
 
     # Class sequence
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
@@ -105,6 +106,7 @@ if __name__ == '__main__':
     seq_num = 0
     subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
     predicted_labels = np.zeros(config['N_TOTAL'], dtype=np.uint8)
+    optim_func_buffer = np.zeros(sel_func_param[0], dtype=float)
 
     # Keep track of the data examples that are currently on the device
     device_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_img']), dtype=np.uint8)
@@ -156,6 +158,12 @@ if __name__ == '__main__':
         send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed], util=util)
         seq_num += 1
 
+        # Set data buffer parameters -----------------------------------------------------------------------------------
+        send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
+                                                                              config['N_EEPROM_BUFFER'],
+                                                                              config['bytes_per_img']], util=util)
+        seq_num += 1
+
         # Prime EEPROM with examples from the 1st class ----------------------------------------------------------------
         class_idxs = get_class_example_indices(train_set, class_seq[0])
         class_subset_idxs = np.random.choice(class_idxs, config['N_EEPROM_BUFFER'], replace=False)
@@ -194,7 +202,7 @@ if __name__ == '__main__':
             # Run subset selection
             print('\tRunning subset selection...')
             send_command(sel_func, seq_num=seq_num, param_list=sel_func_param, util=util,
-                         data_out=[subset_idxs, predicted_labels])
+                         data_out=[subset_idxs, predicted_labels, optim_func_buffer])
             seq_num += 1
 
             # Check that the predicted labels returned by the device match the expected ones

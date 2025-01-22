@@ -295,8 +295,9 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     uint16_t* candidate_subset_idxs = calloc(fun_args->eeprom_buffer_size, sizeof(uint16_t));
     uint16_t* subset_idxs = calloc(fun_args->eeprom_buffer_size, sizeof(uint16_t));
     uint8_t* predicted_labels = calloc(fun_args->num_examples_total, sizeof(uint8_t));
-    if (candidate_subset_idxs == NULL || subset_idxs == NULL || predicted_labels == NULL) {
-        xprintf("mem_error: memory allocation for candidate_subset_idxs, subset_idxs or predicted_labels failed\r\n");
+    float* optim_func_buffer = calloc(num_iter, sizeof(float));
+    if (candidate_subset_idxs == NULL || subset_idxs == NULL || predicted_labels == NULL || optim_func_buffer == NULL) {
+        xprintf("mem_error: memory allocation for candidate_subset_idxs, subset_idxs, predicted_labels or optim_func_buffer failed\r\n");
 		exit(1);
     }
 
@@ -331,16 +332,20 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
             max_avg_class_acc = avg_class_acc;
             float_to_string(max_avg_class_acc, max_avg_class_acc_str, 4);
         }
+
+        optim_func_buffer[i] = max_avg_class_acc;
     }
 
     // Get label predictions using the latest subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
 
-    // Output generated subset and label predictions
+    // Output generated subset, label predictions and max_avg_class_acc_buffer
     read_buffer(subset_idxs, fun_args->eeprom_buffer_size, sizeof(uint16_t), num_per_line);
     xprintf("subset_idxs_read_done\r\n");
     read_buffer(predicted_labels, fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
     xprintf("predicted_labels_read_done\r\n");
+    read_buffer(optim_func_buffer, num_iter, sizeof(float), num_per_line);
+    xprintf("optim_func_buffer_read_done\r\n");
 
     // Move subset data examples located in RAM to EEPROM
     move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);

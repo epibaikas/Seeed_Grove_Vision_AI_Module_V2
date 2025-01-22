@@ -114,31 +114,30 @@ void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs) {
 void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct FunctionArguments *fun_args) {
     uint32_t target_label_count = 0;
     uint16_t *label_idxs;
-    int idx = 0;
+    int sum = 0;
+    int num_of_class_examples_to_be_retained;
 
     // Get the same number of examples from every class
-    uint8_t num_of_available_classes = get_num_of_available_classes(labels, fun_args);
-    int num_of_class_examples_in_subset = ceil(fun_args->eeprom_buffer_size / (float) num_of_available_classes);
-    
+    uint8_t num_of_available_classes = get_num_of_available_classes(labels, fun_args);    
     // xprintf("num_of_available_classes: %u\n\r", num_of_available_classes);
-    // xprintf("num_of_class_examples_in_subset: %d\n\r", num_of_class_examples_in_subset);
 
     for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
         // Get the indices of the examples belonging to the target class
         label_idxs = find_label_indices(labels, fun_args->num_examples_total, i, &target_label_count);
          
+        num_of_class_examples_to_be_retained = round((fun_args->eeprom_buffer_size - sum) / (float) num_of_available_classes);
 
-         if (label_idxs != NULL) {
+        if (label_idxs != NULL) {
             // Shuffle the obtained indices
             shuffle(label_idxs, target_label_count);
 
             // Place the example indices to the subset
-            // Check that you are not exceeding the size of the subset_idxs array
-            for (int j = 0; (j < num_of_class_examples_in_subset) && (idx + j < fun_args->eeprom_buffer_size); j++) {
-                subset_idxs[idx + j] = label_idxs[j];
+            for (int j = 0; j < num_of_class_examples_to_be_retained; j++) {
+                subset_idxs[sum + j] = label_idxs[j];
             }
-            idx += num_of_class_examples_in_subset;
-         }
+            sum += num_of_class_examples_to_be_retained;
+            num_of_available_classes -= 1;
+        }
 
         free(label_idxs);
     }
@@ -257,11 +256,15 @@ void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size, int nu
 
     uint8_t *buf8;
     uint16_t *buf16;
-    
+    float *buf_float;
+    char float_str[10];
+
     if (element_size == sizeof(uint8_t)) {
         buf8 = (uint8_t *)buffer;
     } else if (element_size == sizeof(uint16_t)) {
         buf16 = (uint16_t *)buffer;
+    } else if (element_size == sizeof(float)) {
+        buf_float = (float *)buffer;
     }
 
     for (int i = 0; i < buffer_size; i++) {
@@ -269,7 +272,11 @@ void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size, int nu
             xprintf("%3u ", buf8[i]);
         } else if (element_size == sizeof(uint16_t)) {
             xprintf("%5u ", buf16[i]);
+        } else if (element_size == sizeof(float)) {
+            float_to_string(buf_float[i], float_str, 4);
+            xprintf("%6s ", float_str);
         }
+
         if ((i+1) % num_per_line == 0 || i+1 == buffer_size) {
             xprintf("\r\n");
             xgets(line_buf, LINE_BUFFER_LEN);

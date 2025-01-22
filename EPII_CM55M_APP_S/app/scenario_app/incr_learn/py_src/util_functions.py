@@ -43,6 +43,8 @@ def read_config(config_dir_path):
     num_per_line = config.getint(section='settings', option='num_per_line')
 
     random_seed = config.getint(section='settings', option='random_seed')
+    num_iter = config.getint(section='settings', option='num_iter')
+
     debug = config.getboolean(section='settings', option='debug')
 
     # Paths
@@ -64,6 +66,7 @@ def read_config(config_dir_path):
         'base_flash_addr': base_flash_addr,
         'num_per_line': num_per_line,
         'random_seed': random_seed,
+        'num_iter': num_iter,
         'debug': debug,
         'datasets_dir_path': datasets_dir_path,
         'log_dir_path': log_dir_path,

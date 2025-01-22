@@ -212,6 +212,15 @@ def rand_greedy_subset_selection(param_list, data_out, util):
     if resp_line != 'predicted_labels_read_done\r\r\n':
         raise AssertionError('resp_line not properly received for predicted_labels')
 
+    read_buffer(data_out[2], data_out[2].shape[0], num_per_line, util)
+
+    resp_line = util['ser'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    if resp_line != 'optim_func_buffer_read_done\r\r\n':
+        raise AssertionError('resp_line not properly received for optim_func_buffer')
+
     return 0
 
 def write_buffer(data, size, num_per_line, util):
@@ -239,7 +248,10 @@ def read_buffer(array, size, num_per_line, util):
 
         values = ack_line.split()
         for j, value in enumerate(values):
-            array[i + j] = int(value)
+            if array.dtype != 'float64':
+                array[i + j] = int(value)
+            else:
+                array[i + j] = float(value)
 
         if i + num_per_line > size:
             ack_msg = 'ack {}\r'.format(size)
