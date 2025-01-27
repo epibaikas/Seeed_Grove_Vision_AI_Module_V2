@@ -28,14 +28,14 @@ def img_data(config):
     classes = []
     example_idxs = get_random_balanced_subset_indices(train_set, classes, subset_size=config['N_TOTAL'])
 
-    img_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_img']), dtype=np.uint8)
-    img_data[:, 0:config['data_bytes_per_img']] = X_train[example_idxs, :].numpy().astype(np.uint8)
-    img_data[:, config['data_bytes_per_img']] = y_train[example_idxs].numpy().astype(np.uint8)
+    img_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_example']), dtype=np.uint8)
+    img_data[:, 0:config['data_bytes_per_example']] = X_train[example_idxs, :].numpy().astype(np.uint8)
+    img_data[:, config['data_bytes_per_example']] = y_train[example_idxs].numpy().astype(np.uint8)
     return img_data
 
 @pytest.fixture
 def data_read_buffer(config):
-    return np.zeros(config['bytes_per_img'], np.uint8)
+    return np.zeros(config['bytes_per_example'], np.uint8)
 
 
 @pytest.fixture
@@ -48,8 +48,8 @@ def dist_array(dist_array_size):
 
 @pytest.fixture
 def expected_classifier(config, img_data):
-    classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_img']], img_data[:, config['data_bytes_per_img']])
-    classifier.train(img_data[:, 0:config['data_bytes_per_img']], symmetric=True, bitshift=12)
+    classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_example']], img_data[:, config['data_bytes_per_example']])
+    classifier.train(img_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
     return classifier
 
 @pytest.fixture

@@ -74,9 +74,9 @@ if __name__ == '__main__':
         np.save(path_1, classifier.dists)
         np.save(path_2, classifier.sorting_idxs)
 
-    train_data = np.zeros(shape=(len(train_set), config['bytes_per_img']), dtype=np.uint8)
-    train_data[:, 0:config['data_bytes_per_img']] = X_train.astype(np.uint8)
-    train_data[:, config['data_bytes_per_img']] = y_train.astype(np.uint8)
+    train_data = np.zeros(shape=(len(train_set), config['bytes_per_example']), dtype=np.uint8)
+    train_data[:, 0:config['data_bytes_per_example']] = X_train.astype(np.uint8)
+    train_data[:, config['data_bytes_per_example']] = y_train.astype(np.uint8)
 
     exp_param = f'seq={seq_type}_ram_buf_size={config["N_RAM_BUFFER"]}_eeprom_buf_size={config["N_EEPROM_BUFFER"]}_'
     if sub_sel_func == 0:
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     optim_func_buffer = np.zeros(sel_func_param[0], dtype=float)
 
     # Keep track of the data examples that are currently on the device
-    device_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_img']), dtype=np.uint8)
+    device_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_example']), dtype=np.uint8)
 
     # Keep track of the indices of the data examples on the device with regard to the full training set
     device_data_idxs = np.zeros(config['N_TOTAL'], dtype=np.uint16)
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         # Set data buffer parameters -----------------------------------------------------------------------------------
         send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
                                                                               config['N_EEPROM_BUFFER'],
-                                                                              config['bytes_per_img']], util=util)
+                                                                              config['bytes_per_example']], util=util)
         seq_num += 1
 
         # Prime EEPROM with examples from the 1st class ----------------------------------------------------------------
@@ -206,10 +206,10 @@ if __name__ == '__main__':
             seq_num += 1
 
             # Check that the predicted labels returned by the device match the expected ones
-            expected_classifier = kNearestNeighbors(device_data[:, 0:config['data_bytes_per_img']], device_data[:, config['data_bytes_per_img']])
-            expected_classifier.train(device_data[:, 0:config['data_bytes_per_img']], symmetric=True, bitshift=12)
+            expected_classifier = kNearestNeighbors(device_data[:, 0:config['data_bytes_per_example']], device_data[:, config['data_bytes_per_example']])
+            expected_classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
 
-            expected_predicted_labels = expected_classifier.predict(device_data[:, 0:config['data_bytes_per_img']],
+            expected_predicted_labels = expected_classifier.predict(device_data[:, 0:config['data_bytes_per_example']],
                                         subset_idxs, train_classifier=False, k=3)
             assert np.array_equal(expected_predicted_labels, predicted_labels)
 

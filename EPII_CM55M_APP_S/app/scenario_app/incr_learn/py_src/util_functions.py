@@ -32,8 +32,8 @@ def read_config(config_dir_path):
     # Settings
     port = config.get(section='settings', option='port')
     baudrate = config.getint(section='settings', option='baudrate')
-    bytes_per_img = config.getint(section='settings', option='bytes_per_img')
-    data_bytes_per_img = bytes_per_img - 1
+    bytes_per_example = config.getint(section='settings', option='bytes_per_example')
+    data_bytes_per_example = bytes_per_example - 1
 
     N_RAM_BUFFER = config.getint(section='settings', option='N_RAM_BUFFER')
     N_EEPROM_BUFFER = config.getint(section='settings', option='N_EEPROM_BUFFER')
@@ -58,8 +58,8 @@ def read_config(config_dir_path):
     config_values = {
         'port': port,
         'baudrate': baudrate,
-        'bytes_per_img': bytes_per_img,
-        'data_bytes_per_img': data_bytes_per_img,
+        'bytes_per_example': bytes_per_example,
+        'data_bytes_per_example': data_bytes_per_example,
         'N_RAM_BUFFER': N_RAM_BUFFER,
         'N_EEPROM_BUFFER': N_EEPROM_BUFFER,
         'N_TOTAL': N_TOTAL,

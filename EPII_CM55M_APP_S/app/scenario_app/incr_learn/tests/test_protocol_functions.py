@@ -13,7 +13,7 @@ def test_set_random_seed(seq_num, config, util):
 def test_set_data_buffer_parameters(seq_num, config, util):
     command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num['value'],
                                         param_list=[config['N_RAM_BUFFER'], config['N_EEPROM_BUFFER'],
-                                                    config['bytes_per_img']], util=util)
+                                                    config['bytes_per_example']], util=util)
     increment_seq_num(seq_num)
     assert command_return_value == 0
 
@@ -22,7 +22,7 @@ def test_write_read_ram_buffer(seq_num, config, img_data, util, data_read_buffer
         send_command(write_ram_buffer, seq_num=seq_num['value'], param_list=[i, config['num_per_line']], util=util,
                      data_in=img_data[i])
         increment_seq_num(seq_num)
-        send_command(read_ram_buffer, seq_num=seq_num['value'], param_list=[i, config['num_per_line'], config['bytes_per_img']],
+        send_command(read_ram_buffer, seq_num=seq_num['value'], param_list=[i, config['num_per_line'], config['bytes_per_example']],
                      util=util, data_out=data_read_buffer)
         increment_seq_num(seq_num)
         assert np.array_equal(img_data[i], data_read_buffer)
@@ -33,7 +33,7 @@ def test_write_read_eeprom_buffer(seq_num, config, img_data, util, data_read_buf
         send_command(write_eeprom, seq_num=seq_num['value'], param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line']],
                      util=util, data_in=img_data[i])
         increment_seq_num(seq_num)
-        send_command(read_eeprom, seq_num=seq_num['value'], param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_img']],
+        send_command(read_eeprom, seq_num=seq_num['value'], param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_example']],
                      util=util, data_out=data_read_buffer)
         increment_seq_num(seq_num)
         assert np.array_equal(img_data[i], data_read_buffer)
@@ -59,7 +59,7 @@ def test_read_labels_buffer(seq_num, config, img_data, util, labels_buffer):
     increment_seq_num(seq_num)
 
     # Check correctness of read labels
-    assert np.array_equal(img_data[:, config['bytes_per_img'] - 1], labels_buffer)
+    assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
 
 def test_rand_subset_selection(seq_num, config, img_data, util, subset_idxs, predicted_labels, expected_classifier, data_read_buffer):
@@ -70,7 +70,7 @@ def test_rand_subset_selection(seq_num, config, img_data, util, subset_idxs, pre
     increment_seq_num(seq_num)
 
     # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_img']], subset_idxs, train_classifier=False, k=3)
+    expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=3)
     assert np.array_equal(expected_predicted_labels, predicted_labels)
 
     # Check if RAM subset data have been transferred correctly to EEPROM
@@ -84,7 +84,7 @@ def test_rand_subset_selection(seq_num, config, img_data, util, subset_idxs, pre
     ram_subset_idxs.sort()
 
     for i, eeprom_idx in enumerate(eeprom_idxs_to_be_overwritten):
-        send_command(read_eeprom, seq_num=seq_num['value'], param_list=[(eeprom_idx - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_img']],
+        send_command(read_eeprom, seq_num=seq_num['value'], param_list=[(eeprom_idx - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_example']],
                      util=util, data_out=data_read_buffer)
         increment_seq_num(seq_num)
         assert np.array_equal(img_data[ram_subset_idxs[i]], data_read_buffer)

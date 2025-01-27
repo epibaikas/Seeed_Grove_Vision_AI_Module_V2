@@ -20,18 +20,18 @@ train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_nam
 classes = []
 example_idxs = get_random_balanced_subset_indices(train_set, classes, subset_size=config['N_TOTAL'])
 
-img_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_img']), dtype=np.uint8)
-img_data[:, 0:config['data_bytes_per_img']] = X_train[example_idxs, :].numpy().astype(np.uint8)
-img_data[:, config['data_bytes_per_img']] = y_train[example_idxs].numpy().astype(np.uint8)
+img_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_example']), dtype=np.uint8)
+img_data[:, 0:config['data_bytes_per_example']] = X_train[example_idxs, :].numpy().astype(np.uint8)
+img_data[:, config['data_bytes_per_example']] = y_train[example_idxs].numpy().astype(np.uint8)
 
 # Create temporary buffers for checking correctness of read values
-data_read_buffer = np.zeros(config['bytes_per_img'], np.uint8)
+data_read_buffer = np.zeros(config['bytes_per_example'], np.uint8)
 
 dist_array_size = int(config['N_TOTAL'] * (config['N_TOTAL'] + 1) / 2)
 dist_array = np.zeros(dist_array_size, dtype=np.uint16)
 
-expected_classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_img']], img_data[:, config['data_bytes_per_img']])
-expected_classifier.train(img_data[:, 0:config['data_bytes_per_img']], symmetric=True, bitshift=12)
+expected_classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_example']], img_data[:, config['data_bytes_per_example']])
+expected_classifier.train(img_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
 
 labels_buffer = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
@@ -73,21 +73,21 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     seq_num += 1
 
     command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
-                                        config['N_EEPROM_BUFFER'], config['bytes_per_img']], util=util)
+                                        config['N_EEPROM_BUFFER'], config['bytes_per_example']], util=util)
     seq_num += 1
 
     for i in range(config['N_TOTAL']):
         if i < config['N_RAM_BUFFER']:
             send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util, data_in=img_data[i])
             seq_num += 1
-            send_command(read_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line'], config['bytes_per_img']], util=util, data_out=data_read_buffer)
+            send_command(read_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line'], config['bytes_per_example']], util=util, data_out=data_read_buffer)
             seq_num += 1
             assert np.array_equal(img_data[i], data_read_buffer)
 
         else:
             send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line']], util=util, data_in=img_data[i])
             seq_num += 1
-            send_command(read_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_img']], util=util, data_out=data_read_buffer)
+            send_command(read_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_example']], util=util, data_out=data_read_buffer)
             seq_num += 1
             assert np.array_equal(img_data[i], data_read_buffer)
 
@@ -108,13 +108,13 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     seq_num += 1
 
     # Check correctness of read labels
-    assert np.array_equal(img_data[:, config['bytes_per_img'] - 1], labels_buffer)
+    assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
     send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[100, 200], util=util, data_out=[subset_idxs, predicted_labels])
     seq_num += 1
 
     # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_img']], subset_idxs, train_classifier=False, k=3)
+    expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=3)
 
     for i, _ in enumerate(predicted_labels):
         print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))
