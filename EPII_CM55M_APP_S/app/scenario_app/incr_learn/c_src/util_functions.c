@@ -121,11 +121,11 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct Functi
     uint8_t num_of_available_classes = get_num_of_available_classes(labels, fun_args);    
     // xprintf("num_of_available_classes: %u\n\r", num_of_available_classes);
 
-    for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
+    for (uint8_t i = 0; i < fun_args->num_of_classes; i++) {
         // Get the indices of the examples belonging to the target class
         label_idxs = find_label_indices(labels, fun_args->num_examples_total, i, &target_label_count);
          
-        num_of_class_examples_to_be_retained = round((fun_args->eeprom_buffer_size - sum) / (float) num_of_available_classes);
+        num_of_class_examples_to_be_retained = ceil((fun_args->eeprom_buffer_size - sum) / (float) num_of_available_classes);
 
         if (label_idxs != NULL) {
             // Shuffle the obtained indices
@@ -142,7 +142,7 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct Functi
         free(label_idxs);
     }
 
-    // uint16_t *label_counts = (uint16_t *)calloc(NUM_OF_CLASSES, sizeof(uint16_t));
+    // uint16_t *label_counts = (uint16_t *)calloc(fun_args->num_of_classes, sizeof(uint16_t));
     // if (label_counts == NULL) {
     //     xprintf("mem_error: memory allocation for label_counts failed\r\n");
 	// 	exit(1);
@@ -152,7 +152,7 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct Functi
     //     label_counts[labels[subset_idxs[i]]]++;
     // }
 
-    // for (int i = 0; i < NUM_OF_CLASSES; i++) {
+    // for (int i = 0; i < fun_args->num_of_classes; i++) {
     //     xprintf("label %d, count: %u\r\n", i, label_counts[i]);
     // }
     // free(label_counts);
@@ -173,8 +173,8 @@ int compare_indices(void *arr, const void *a, const void *b) {
     return idx1 - idx2;
 }
 
-uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k) {
-    uint8_t *label_counts = (uint8_t *)calloc(NUM_OF_CLASSES, sizeof(uint8_t));
+uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k, struct FunctionArguments *fun_args) {
+    uint8_t *label_counts = (uint8_t *)calloc(fun_args->num_of_classes, sizeof(uint8_t));
     if (label_counts == NULL) {
         xprintf("mem_error: memory allocation for label_counts failed\r\n");
 		exit(1);
@@ -185,7 +185,7 @@ uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k) {
         label_counts[label]++;
     }
 
-    uint8_t max_index = find_max_index(&label_counts[0], NUM_OF_CLASSES);
+    uint8_t max_index = find_max_index(&label_counts[0], fun_args->num_of_classes);
 
     // for (int i = 0; i < NUM_OF_CLASSES; i++) {
     //     xprintf("[label %d: %u], ", i, label_counts[i]);
@@ -350,7 +350,7 @@ uint16_t* find_label_indices(uint8_t *labels, uint16_t labels_array_size, uint8_
 uint8_t get_num_of_available_classes(uint8_t *labels, struct FunctionArguments *fun_args) {
     uint8_t num_of_available_classes = 0;
     
-    uint16_t *label_counts = (uint16_t *)calloc(NUM_OF_CLASSES, sizeof(uint16_t));
+    uint16_t *label_counts = (uint16_t *)calloc(fun_args->num_of_classes, sizeof(uint16_t));
     if (label_counts == NULL) {
         xprintf("mem_error: memory allocation for label_counts failed\r\n");
 		exit(1);
@@ -360,7 +360,7 @@ uint8_t get_num_of_available_classes(uint8_t *labels, struct FunctionArguments *
         label_counts[labels[i]]++;
     }
     
-    for (int i = 0; i < NUM_OF_CLASSES; i++) {
+    for (int i = 0; i < fun_args->num_of_classes; i++) {
         if (label_counts[i] > 0) {
             num_of_available_classes++;
         }
@@ -399,7 +399,7 @@ void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_
         }
 
         // xprintf("Example %d, Nearest Neighbhours: [%u, %u, %u, %u, %u] \r\n", i, indices[0], indices[1], indices[2], indices[3], indices[4]);
-        predicted_labels[i] = predict_label(indices, fun_args->labels, kNN_k);
+        predicted_labels[i] = predict_label(indices, fun_args->labels, kNN_k, fun_args);
     }
 
     free(temp_dist_buf);
@@ -415,7 +415,7 @@ float get_avg_class_acc(uint8_t *labels, uint8_t *predict_labels, struct Functio
     float acc_sum = 0.0;
     float avg_acc = 0.0;
 
-    for (uint8_t i = 0; i < NUM_OF_CLASSES; i++) {
+    for (uint8_t i = 0; i < fun_args->num_of_classes; i++) {
         // Get the indices of the examples belonging to the target class
         label_idxs = find_label_indices(labels, fun_args->num_examples_total, i, &target_label_count);
         

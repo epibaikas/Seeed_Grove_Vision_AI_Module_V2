@@ -263,10 +263,10 @@ def read_buffer(array, size, num_per_line, util):
 
 
 def set_data_buffer_parameters(param_list, util):
-    if len(param_list) != 3:
+    if len(param_list) != 4:
         raise AssertionError('Incorrect param_list length')
 
-    for i in range(12):
+    for i in range(13):
         resp_line = util['ser'].readline().decode()
         debug_print(resp_line, end='', debug=util['debug'])
         util['resp_logger'].info(resp_line.rstrip())

@@ -16,6 +16,7 @@ np.random.seed(config['random_seed'])
 dataset_name = 'FashionMNIST'
 device = 'cpu'
 train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
+num_of_classes = len(train_set.classes)
 
 classes = []
 example_idxs = get_random_balanced_subset_indices(train_set, classes, subset_size=config['N_TOTAL'])
@@ -73,7 +74,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     seq_num += 1
 
     command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
-                                        config['N_EEPROM_BUFFER'], config['bytes_per_example']], util=util)
+                                        config['N_EEPROM_BUFFER'], config['bytes_per_example'], num_of_classes], util=util)
     seq_num += 1
 
     for i in range(config['N_TOTAL']):

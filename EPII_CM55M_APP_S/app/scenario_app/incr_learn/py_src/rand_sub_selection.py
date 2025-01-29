@@ -49,6 +49,7 @@ if __name__ == '__main__':
     # Load dataset
     device = 'cpu'
     train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
+    num_of_classes = len(train_set.classes)
 
     X_train = X_train.numpy().astype(np.uint8)
     y_train = y_train.numpy().astype(np.uint8)
@@ -161,7 +162,8 @@ if __name__ == '__main__':
         # Set data buffer parameters -----------------------------------------------------------------------------------
         send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
                                                                               config['N_EEPROM_BUFFER'],
-                                                                              config['bytes_per_example']], util=util)
+                                                                              config['bytes_per_example'],
+                                                                              num_of_classes], util=util)
         seq_num += 1
 
         # Prime EEPROM with examples from the 1st class ----------------------------------------------------------------

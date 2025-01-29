@@ -16,7 +16,7 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct Functi
 
 int compare_subset_indices(const void *a, const void *b);
 int compare_indices(void *arr, const void *a, const void *b);
-uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k);
+uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k, struct FunctionArguments *fun_args);
 uint8_t find_max_index(uint8_t *array, size_t size);
 
 void get_example_flash_addr(int example_num, int* flash_sector_num, uint32_t* flash_sector_start_addr, int* flash_sector_idx, struct FunctionArguments *fun_args);

@@ -10,8 +10,11 @@ def load_dataset(dataset_name, root_dir, device):
         train_set = datasets.FashionMNIST(root=root_dir, download=True, transform=ToTensor(), train=True)
         test_set = datasets.FashionMNIST(root=root_dir, download=True, transform=ToTensor(), train=False)
     elif dataset_name == 'MNIST':
-        train_set = datasets.MNIST(root='datasets/', download=True, transform=ToTensor(), train=True)
-        test_set = datasets.MNIST(root='datasets/', download=True, transform=ToTensor(), train=False)
+        train_set = datasets.MNIST(root=root_dir, download=True, transform=ToTensor(), train=True)
+        test_set = datasets.MNIST(root=root_dir, download=True, transform=ToTensor(), train=False)
+    elif dataset_name == 'EMNIST':
+        train_set = datasets.EMNIST(root=root_dir, split='balanced', download=True, transform=ToTensor(), train=True)
+        test_set = datasets.EMNIST(root=root_dir, split='balanced', download=True, transform=ToTensor(), train=False)
     else:
         raise argparse.ArgumentTypeError('Unknown dataset name')
 

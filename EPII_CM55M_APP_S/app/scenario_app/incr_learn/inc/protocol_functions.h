@@ -10,6 +10,7 @@ struct FunctionArguments {
   uint32_t bytes_per_example;
   uint32_t data_bytes_per_example;
   int examples_per_eeprom_sector;
+  uint32_t num_of_classes;
 
   uint8_t **ram_buffer;
   uint8_t *eeprom_buffer;

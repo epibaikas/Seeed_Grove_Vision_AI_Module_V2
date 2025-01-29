@@ -10,10 +10,10 @@ def test_set_random_seed(seq_num, config, util):
     increment_seq_num(seq_num)
     assert command_return_value == 0
 
-def test_set_data_buffer_parameters(seq_num, config, util):
+def test_set_data_buffer_parameters(seq_num, config, dataset, util):
     command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num['value'],
                                         param_list=[config['N_RAM_BUFFER'], config['N_EEPROM_BUFFER'],
-                                                    config['bytes_per_example']], util=util)
+                                                    config['bytes_per_example'], dataset['num_of_classes']], util=util)
     increment_seq_num(seq_num)
     assert command_return_value == 0
 

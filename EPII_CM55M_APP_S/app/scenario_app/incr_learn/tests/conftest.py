@@ -20,17 +20,28 @@ def config():
     return config
 
 @pytest.fixture(scope='session')
-def img_data(config):
-    dataset_name = 'FashionMNIST'
+def dataset(config):
+    dataset_name = 'EMNIST'
     device = 'cpu'
     train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
 
+    dataset = {'train_set': train_set,
+               'test_set': test_set,
+               'X_train': X_train,
+               'y_train': y_train,
+               'X_test': X_test,
+               'y_test': y_test,
+               'num_of_classes': len(train_set.classes)}
+    return dataset
+
+@pytest.fixture(scope='session')
+def img_data(config, dataset):
     classes = []
-    example_idxs = get_random_balanced_subset_indices(train_set, classes, subset_size=config['N_TOTAL'])
+    example_idxs = get_random_balanced_subset_indices(dataset['train_set'], classes, subset_size=config['N_TOTAL'])
 
     img_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_example']), dtype=np.uint8)
-    img_data[:, 0:config['data_bytes_per_example']] = X_train[example_idxs, :].numpy().astype(np.uint8)
-    img_data[:, config['data_bytes_per_example']] = y_train[example_idxs].numpy().astype(np.uint8)
+    img_data[:, 0:config['data_bytes_per_example']] = dataset['X_train'][example_idxs, :].numpy().astype(np.uint8)
+    img_data[:, config['data_bytes_per_example']] = dataset['y_train'][example_idxs].numpy().astype(np.uint8)
     return img_data
 
 @pytest.fixture

@@ -359,9 +359,10 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
     uint32_t ram_buffer_size;
     uint32_t eeprom_buffer_size;
     uint32_t bytes_per_example;
+    uint32_t num_of_classes;
     int sscanf_ret_value = 0;
 
-    sscanf_ret_value = sscanf(fun_args->param, "%u %u %u", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example);
+    sscanf_ret_value = sscanf(fun_args->param, "%u %u %u %u", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example, &num_of_classes);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: set_data_buffer_parameters() parameters not parsed correctly\r\n");
         exit(1);
@@ -375,6 +376,7 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
     fun_args->bytes_per_example = bytes_per_example;
     fun_args->data_bytes_per_example = bytes_per_example - 1;
     fun_args->examples_per_eeprom_sector = EEPROM_SECTOR_SIZE / bytes_per_example;
+    fun_args->num_of_classes = num_of_classes;
 
     // Allocate memory for RAM buffer
 	uint8_t **ram_buffer = (uint8_t **)calloc(fun_args->ram_buffer_size, sizeof(uint8_t *));
@@ -412,6 +414,7 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
     xprintf("bytes_per_example: %u\r\n", fun_args->bytes_per_example);
     xprintf("data_bytes_per_example: %u\r\n", fun_args->data_bytes_per_example);
     xprintf("examples_per_eeprom_sector: %u\r\n", fun_args->examples_per_eeprom_sector);
+    xprintf("num_of_classes: %u\r\n", fun_args->num_of_classes);
 
 	xprintf("Addr of dist_matrix: 0x%08x\r\n", fun_args->dist_matrix);
 	xprintf("Addr of eeprom_buffer: 0x%08x\r\n", fun_args->eeprom_buffer);
