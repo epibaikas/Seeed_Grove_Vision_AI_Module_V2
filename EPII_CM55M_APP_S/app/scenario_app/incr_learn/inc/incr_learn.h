@@ -20,7 +20,6 @@
 #define EEPROM_BASE_ADDRESS 0x00201000
 #define EEPROM_SECTOR_SIZE 4096
 
-#define NUM_OF_CLASSES 10
 #define kNN_k 3
 
 int app_main(void);
