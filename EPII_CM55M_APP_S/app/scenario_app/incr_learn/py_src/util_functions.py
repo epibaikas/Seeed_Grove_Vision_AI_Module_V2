@@ -20,60 +20,32 @@ def get_symmetric_2D_array_index(array_size, i, j):
 
     return index
 
+def parse_config_value(value):
+    """Convert string values to appropriate types (int, float, bool, or keep as string)."""
+    if value.lower() in ('true', 'false'):
+        return value.lower() == 'true'
+    try:
+        if '.' in value:
+            return float(value)
+        return int(value)
+    except ValueError:
+        return value  # Return as string if not a number or boolean
 
-def read_config(config_dir_path):
+def read_config(config_dir_path, config_filename):
     # Create a ConfigParser object
     config = configparser.ConfigParser()
+    config.optionxform = str  # Preserve case
 
     # Read the configuration file
-    config.read(os.path.join(config_dir_path, 'config.ini'))
+    config.read(os.path.join(config_dir_path, config_filename))
 
-    # Access values from the configuration file
-    # Settings
-    port = config.get(section='settings', option='port')
-    baudrate = config.getint(section='settings', option='baudrate')
-    bytes_per_example = config.getint(section='settings', option='bytes_per_example')
-    data_bytes_per_example = bytes_per_example - 1
+    config_values = {}
+    for section in config.sections():
+        config_section = {key: parse_config_value(value) for key, value in config[section].items()}
+        config_values |= config_section
 
-    N_RAM_BUFFER = config.getint(section='settings', option='N_RAM_BUFFER')
-    N_EEPROM_BUFFER = config.getint(section='settings', option='N_EEPROM_BUFFER')
-    N_TOTAL = N_RAM_BUFFER + N_EEPROM_BUFFER
-
-    base_flash_addr = config.get(section='settings', option='base_flash_addr')
-    num_per_line = config.getint(section='settings', option='num_per_line')
-
-    random_seed = config.getint(section='settings', option='random_seed')
-    num_iter = config.getint(section='settings', option='num_iter')
-
-    debug = config.getboolean(section='settings', option='debug')
-
-    # Paths
-    datasets_dir_path = config.get(section='paths', option='datasets_dir_path')
-    log_dir_path = config.get(section='paths', option='log_dir_path')
-    artifacts_dir_path = config.get(section='paths', option='artifacts_dir_path')
-    results_dir_path = config.get(section='paths', option='results_dir_path')
-    plots_dir_path = config.get(section='paths', option='plots_dir_path')
-
-    # Return a dictionary with the retrieved values
-    config_values = {
-        'port': port,
-        'baudrate': baudrate,
-        'bytes_per_example': bytes_per_example,
-        'data_bytes_per_example': data_bytes_per_example,
-        'N_RAM_BUFFER': N_RAM_BUFFER,
-        'N_EEPROM_BUFFER': N_EEPROM_BUFFER,
-        'N_TOTAL': N_TOTAL,
-        'base_flash_addr': base_flash_addr,
-        'num_per_line': num_per_line,
-        'random_seed': random_seed,
-        'num_iter': num_iter,
-        'debug': debug,
-        'datasets_dir_path': datasets_dir_path,
-        'log_dir_path': log_dir_path,
-        'artifacts_dir_path': artifacts_dir_path,
-        'results_dir_path': results_dir_path,
-        'plots_dir_path': plots_dir_path
-    }
+    if 'N_RAM_BUFFER' in config_values.keys():
+        config_values['N_TOTAL'] = config_values['N_RAM_BUFFER'] + config_values['N_EEPROM_BUFFER']
 
     return config_values
 

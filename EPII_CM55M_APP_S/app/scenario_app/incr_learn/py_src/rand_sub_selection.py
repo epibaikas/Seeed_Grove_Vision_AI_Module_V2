@@ -38,7 +38,8 @@ if __name__ == '__main__':
 
     # Get configuration parameters
     config_dir_path = 'config/'
-    config = read_config(config_dir_path)
+    config = read_config(config_dir_path, 'config_global.ini')
+    config |= read_config(config_dir_path, 'config_exper.ini')
 
     # Adjust the random seed based on the trial number
     random_seed = config['random_seed'] + trial
@@ -49,6 +50,8 @@ if __name__ == '__main__':
     # Load dataset
     device = 'cpu'
     train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
+    config['bytes_per_example'] = X_train.shape[1] + 1
+    config['data_bytes_per_example'] = X_train.shape[1]
     num_of_classes = len(train_set.classes)
 
     X_train = X_train.numpy().astype(np.uint8)

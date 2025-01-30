@@ -16,14 +16,17 @@ def seq_num():
 @pytest.fixture(scope='session')
 def config():
     config_dir_path = 'config/'
-    config = read_config(config_dir_path)
+    config = read_config(config_dir_path, 'config_global.ini')
+    config |= read_config(config_dir_path, 'config_pytest.ini')
     return config
 
 @pytest.fixture(scope='session')
 def dataset(config):
-    dataset_name = 'EMNIST'
+    dataset_name = 'FashionMNIST'
     device = 'cpu'
     train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
+    config['bytes_per_example'] = X_train.shape[1] + 1
+    config['data_bytes_per_example'] = X_train.shape[1]
 
     dataset = {'train_set': train_set,
                'test_set': test_set,
@@ -103,7 +106,8 @@ def util(config, request):
 @pytest.hookimpl()
 def pytest_sessionstart(session):
     config_dir_path = 'config/'
-    config = read_config(config_dir_path)
+    config = read_config(config_dir_path, 'config_global.ini')
+    config |= read_config(config_dir_path, 'config_pytest.ini')
 
     # Set random seed
     np.random.seed(config['random_seed'])
@@ -124,7 +128,8 @@ def pytest_sessionfinish(session, exitstatus):
     util = session.config.util
 
     config_dir_path = 'config/'
-    config = read_config(config_dir_path)
+    config = read_config(config_dir_path, 'config_global.ini')
+    config |= read_config(config_dir_path, 'config_pytest.ini')
 
     log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
     req_log_xml_file_path = os.path.join(log_xml_dir_path, 'test_requests_log.xml')

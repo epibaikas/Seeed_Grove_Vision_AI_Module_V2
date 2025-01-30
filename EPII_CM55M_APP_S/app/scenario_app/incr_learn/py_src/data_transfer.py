@@ -8,7 +8,8 @@ from data_utils import load_dataset, get_random_balanced_subset_indices
 from classifiers.k_nearest_neighbors_numpy import kNearestNeighbors
 
 config_dir_path = 'config/'
-config = read_config(config_dir_path)
+config = read_config(config_dir_path, 'config_global.ini')
+config |= read_config(config_dir_path, 'config_pytest.ini')
 
 # Set random seed
 np.random.seed(config['random_seed'])
@@ -16,6 +17,8 @@ np.random.seed(config['random_seed'])
 dataset_name = 'FashionMNIST'
 device = 'cpu'
 train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(dataset_name, config['datasets_dir_path'], device)
+config['bytes_per_example'] = X_train.shape[1] + 1
+config['data_bytes_per_example'] = X_train.shape[1]
 num_of_classes = len(train_set.classes)
 
 classes = []
@@ -37,6 +40,7 @@ expected_classifier.train(img_data[:, 0:config['data_bytes_per_example']], symme
 labels_buffer = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
 predicted_labels = np.zeros(config['N_TOTAL'], dtype=np.uint8)
+optim_func_buffer = np.zeros(config['num_iter'], dtype=float)
 
 with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     board_init(ser)
@@ -111,7 +115,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     # Check correctness of read labels
     assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
-    send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[100, 200], util=util, data_out=[subset_idxs, predicted_labels])
+    send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[100, 200], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer])
     seq_num += 1
 
     # Check if predicted labels match the expected predicted labels
