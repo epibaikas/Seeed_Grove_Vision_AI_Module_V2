@@ -1,12 +1,12 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "xprintf.h"
-#include "spi_eeprom_comm.h"
 #include "incr_learn.h"
 #include "util_functions.h"
 #include "protocol_functions.h"
-#include "arm_mve.h"
 
 uint16_t* allocate_symmetric_2D_array(uint32_t N) {
     // Number of elements in the upper triangle of the symmetric matrix including diagonal
@@ -52,24 +52,6 @@ uint32_t get_symmetric_2D_array_index(uint32_t N, uint32_t i, uint32_t j) {
 
 
     return index;
-}
-
-uint32_t dot_prod_uint8_vect(uint8_t* pSrcA, uint8_t* pSrcB, uint32_t blockSize) {
-    uint32_t result = 0;
-    uint32_t num_of_whole_blocks = blockSize / 16;
-
-    for (int i = 0; i < num_of_whole_blocks; i++) {
-        uint8_t* pOne = &pSrcA[16*i];
-        uint8_t* pTwo = &pSrcB[16*i];
-        
-        // Load the values from the array blocks
-        uint8x16_t VectorOne = vld1q_u8(pOne);
-        uint8x16_t VectorTwo = vld1q_u8(pTwo);
-
-        result = vmladavaq_u8(result, VectorTwo, VectorOne);
-    }
-
-    return result;
 }
 
 // Function to shuffle array using Fisher-Yates algorithm
@@ -209,13 +191,6 @@ uint8_t find_max_index(uint8_t *array, size_t size) {
     return max_index;
 }
 
-void get_example_flash_addr(int example_num, int* flash_sector_num, uint32_t* flash_sector_start_addr, int* flash_sector_idx, struct FunctionArguments *fun_args) {
-    *flash_sector_num = example_num / fun_args->examples_per_eeprom_sector;
-
-    *flash_sector_start_addr = EEPROM_BASE_ADDRESS + (EEPROM_SECTOR_SIZE * (uint32_t)(*flash_sector_num));
-    *flash_sector_idx = (example_num % fun_args->examples_per_eeprom_sector) * fun_args->bytes_per_example;
-}
-
 void write_buffer(uint8_t* buffer, uint32_t buffer_size, int num_per_line) {
     char line_buf[LINE_BUFFER_LEN];
     char *data;
@@ -251,8 +226,8 @@ void write_buffer(uint8_t* buffer, uint32_t buffer_size, int num_per_line) {
 
 void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size, int num_per_line) {
     char line_buf[LINE_BUFFER_LEN];
-    char idx_str[12];
-    char ack_str[10];
+    char idx_str[20];
+    char ack_str[20];
 
     uint8_t *buf8;
     uint16_t *buf16;
@@ -289,26 +264,6 @@ void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size, int nu
                 xprintf("line_buf: %s, ack_str: %s\r\n", line_buf, ack_str);
                 exit(1);
             }
-        }
-    }
-}
-
-void update_labels_buffer(struct FunctionArguments *fun_args) {
-    int example_num = 0;
-    int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
-    int flash_sector_idx = 0;
-
-    for (int i = 0; i < fun_args->num_examples_total; i++) {
-        if (i < fun_args->ram_buffer_size) {
-            fun_args->labels[i] = fun_args->ram_buffer[i][fun_args->bytes_per_example - 1];
-        } else {
-            example_num = i - fun_args->ram_buffer_size;
-            get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
-
-            // Read only the last byte that contains the label of the examples stored in EEPROM
-            hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr + (uint32_t)flash_sector_idx + fun_args->bytes_per_example - 1, &(fun_args->eeprom_buffer[0]), 1);
-            fun_args->labels[i] = fun_args->eeprom_buffer[0];
         }
     }
 }
@@ -542,64 +497,4 @@ void float_to_string(float num, char *str, int precision) {
     } else {
         sprintf(str, "%s.%s", int_str, frac_str);
     }
-}
-
-void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args) {
-    // Sort subset_idxs in ascending order
-    qsort(subset_idxs, subset_size, sizeof(uint16_t), compare_subset_indices);
-
-    // Get the indices of examples in eeprom that will be replaced by examples in RAM
-    // Find the index of the first eeprom data example in sorted subset_idxs
-    int first_eeprom_idx = 0;
-    while (subset_idxs[first_eeprom_idx] < fun_args->ram_buffer_size && first_eeprom_idx < subset_size) {
-        first_eeprom_idx++;
-    }
-
-    // Find eeprom indices where data from RAM buffer will be placed.
-    // These are the indices of eeprom exampels that are not in the subset
-    uint16_t* eeprom_indices_not_in_subset  = calloc(first_eeprom_idx, sizeof(uint16_t));
-    if (eeprom_indices_not_in_subset == NULL) {
-        xprintf("mem_error: memory allocation for eeprom_indices_not_in_subset failed");
-        exit(1);
-    }
-
-    int i = 0;
-    int j = first_eeprom_idx;
-    for (uint16_t idx = fun_args->ram_buffer_size; idx < fun_args->num_examples_total; idx++) {
-        if (idx == subset_idxs[j]) {
-            j++;
-        } else {
-            // The index does not belong to the subset
-            // Add it to eeprom_indices_not_in_subset
-            eeprom_indices_not_in_subset[i] = idx;
-            i++;
-        }
-    }
-
-    int example_num = 0;
-    int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
-    int flash_sector_idx = 0;
-
-    // Replace EEPROM examples that are not in the subset with examples from RAM
-    for (int i = 0; i < first_eeprom_idx; i++) {
-        example_num = eeprom_indices_not_in_subset[i] - fun_args->ram_buffer_size; // Subtract fun_args->ram_buffer_size to change index range to [0, NUM_OF_IMGS_IN_EEPROM - 1]
-
-        // Determine flash_sector_num based on example_num
-        get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
-
-        // Read contents from flash sector to eeprom_sector_buffer 
-        hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE);
-
-        // Erase flash sector
-        hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, flash_sector_start_addr, FLASH_SECTOR);
-
-        // Copy the contents of ram_buffer[subset_idxs[i]] to eeprom_sector_buffer
-        memcpy(&(fun_args->eeprom_sector_buffer[flash_sector_idx]),  fun_args->ram_buffer[subset_idxs[i]], fun_args->bytes_per_example);
-
-        // Write data in eeprom_sector_buffer to flash
-        hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE, 0);
-    }
-
-    free(eeprom_indices_not_in_subset);
 }

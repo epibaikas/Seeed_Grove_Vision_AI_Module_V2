@@ -38,7 +38,8 @@ def send_command(command_name, seq_num, param_list, util, data_in=None, data_out
     debug_print(ack_line, end='', debug=util['debug'])
     util['resp_logger'].info(ack_line.rstrip())
 
-    if ack_line != 'ack_begin {}\r\r\n'.format(seq_num):
+    ack_line = ack_line.replace('\r', '').replace('\n', '')
+    if ack_line != 'ack_begin {}'.format(seq_num):
         raise AssertionError('ack_begin not properly received')
 
     resp_xml.set('seq_num', str(seq_num))
@@ -61,7 +62,9 @@ def send_command(command_name, seq_num, param_list, util, data_in=None, data_out
     ack_line = util['ser'].readline().decode()
     debug_print(ack_line, debug=util['debug'])
     util['resp_logger'].info(ack_line)
-    if ack_line != 'ack_end {}\r\r\n'.format(seq_num):
+
+    ack_line = ack_line.replace('\r', '').replace('\n', '')
+    if ack_line != 'ack_end {}'.format(seq_num):
         raise AssertionError('ack_end not properly received')
 
     resp_end_time_xml.text = str(dt.now())
@@ -134,7 +137,8 @@ def compute_dist_matrix(param_list, util):
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
-    if resp_line != 'done\r\r\n':
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'done':
         raise AssertionError('resp_line not properly received')
 
     return 0
@@ -164,7 +168,8 @@ def rand_subset_selection(param_list, data_out, util):
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
-    if resp_line != 'subset_idxs_read_done\r\r\n':
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'subset_idxs_read_done':
         raise AssertionError('resp_line not properly received for subset_idxs read')
 
     read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
@@ -173,7 +178,8 @@ def rand_subset_selection(param_list, data_out, util):
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
-    if resp_line != 'predicted_labels_read_done\r\r\n':
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'predicted_labels_read_done':
         raise AssertionError('resp_line not properly received for predicted_labels')
 
     return 0
@@ -200,7 +206,8 @@ def rand_greedy_subset_selection(param_list, data_out, util):
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
-    if resp_line != 'subset_idxs_read_done\r\r\n':
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'subset_idxs_read_done':
         raise AssertionError('resp_line not properly received for subset_idxs read')
 
     read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
@@ -209,7 +216,8 @@ def rand_greedy_subset_selection(param_list, data_out, util):
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
-    if resp_line != 'predicted_labels_read_done\r\r\n':
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'predicted_labels_read_done':
         raise AssertionError('resp_line not properly received for predicted_labels')
 
     read_buffer(data_out[2], data_out[2].shape[0], num_per_line, util)
@@ -218,7 +226,8 @@ def rand_greedy_subset_selection(param_list, data_out, util):
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
-    if resp_line != 'optim_func_buffer_read_done\r\r\n':
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'optim_func_buffer_read_done':
         raise AssertionError('resp_line not properly received for optim_func_buffer')
 
     return 0
@@ -237,7 +246,9 @@ def write_buffer(data, size, num_per_line, util):
         debug_print(ack_line, end='', debug=util['debug'])
         util['resp_logger'].debug(ack_line.rstrip())
 
-        if ack_line != req_msg + '\r\n':
+        ack_line = ack_line.replace('\r', '').replace('\n', '')
+        req_msg = req_msg.strip('\r')
+        if ack_line != req_msg:
             raise AssertionError('Echoed data do not match written data')
 
 def read_buffer(array, size, num_per_line, util):
@@ -283,7 +294,8 @@ def set_random_seed(param_list, util):
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
-    if resp_line != f'random seed set to: {random_seed}\r\r\n':
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != f'random seed set to: {random_seed}':
         raise AssertionError('resp_line not properly received')
 
     return 0

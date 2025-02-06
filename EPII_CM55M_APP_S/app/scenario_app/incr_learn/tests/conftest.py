@@ -1,6 +1,7 @@
 import pytest
 import serial
 import os
+import subprocess
 import numpy as np
 from xml.etree import ElementTree as ET
 
@@ -78,6 +79,15 @@ def subset_idxs(config):
 def predicted_labels(config):
     return np.zeros(config['N_TOTAL'], dtype=np.uint8)
 
+@pytest.fixture(scope='session', autouse=True)
+def host_process(config):
+    if config['host']:
+        device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])])
+    yield
+    if config['host']:
+        device_emulation.terminate()
+        device_emulation.wait()
+
 @pytest.fixture(scope='session')
 def util(config, request):
     log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
@@ -91,7 +101,8 @@ def util(config, request):
 
     ser = serial.Serial(config['port'], config['baudrate'], timeout=None)
     # Wait for the initialisation stage on the board to be completed
-    board_init(ser)
+    if config['host'] == False:
+        board_init(ser)
 
     util = {'ser': ser,
             'req_logger': req_logger,

@@ -13,6 +13,7 @@ struct FunctionArguments {
   uint32_t num_of_classes;
 
   uint8_t **ram_buffer;
+  uint8_t **eeprom_buffer_host;
   uint8_t *eeprom_buffer;
   uint8_t *eeprom_buffer_2;
   uint8_t *eeprom_sector_buffer;
@@ -21,15 +22,18 @@ struct FunctionArguments {
   unsigned int random_seed;
 };
 
+#ifdef HOST_PLATFORM
+  #include "platform/host/protocol_functions_host.h"
+#elif defined(GROVE_VISION_WE2)
+  #include "platform/grove_vision_we2/protocol_functions_grove_vision_we2.h"
+#endif
+
 typedef void (*function_pointer)(struct FunctionArguments *);
 
 void write_ram_buffer(struct FunctionArguments *fun_args);
 void read_ram_buffer(struct FunctionArguments *fun_args);
-void write_eeprom(struct FunctionArguments *fun_args);
-void read_eeprom(struct FunctionArguments *fun_args);
 void read_labels_buffer(struct FunctionArguments *fun_args);
 
-void compute_dist_matrix(struct FunctionArguments *fun_args);
 void read_dist_matrix(struct FunctionArguments *fun_args);
 void rand_subset_selection(struct FunctionArguments *fun_args);
 void rand_greedy_subset_selection(struct FunctionArguments *fun_args);

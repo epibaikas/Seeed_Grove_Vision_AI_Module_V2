@@ -3,6 +3,7 @@ import serial
 import sys
 from tqdm import tqdm
 import pickle
+import subprocess
 
 from protocol_functions import *
 from argparse_utlis import *
@@ -82,17 +83,18 @@ if __name__ == '__main__':
     train_data[:, 0:config['data_bytes_per_example']] = X_train.astype(np.uint8)
     train_data[:, config['data_bytes_per_example']] = y_train.astype(np.uint8)
 
-    exp_param = f'seq={seq_type}_ram_buf_size={config["N_RAM_BUFFER"]}_eeprom_buf_size={config["N_EEPROM_BUFFER"]}_'
+    exp_param = (f'sub_selection_emulation={str(config["host"]).lower()}_seq={seq_type}_ram_buf_size={config["N_RAM_BUFFER"]}_eeprom_buf_size='
+                 f'{config["N_EEPROM_BUFFER"]}_')
     if sub_sel_func == 0:
-        filename_prefix = f'{dataset_name}_rand_sub_selection_' + exp_param + f'trial={trial}_'
+        filename_prefix = f'{dataset_name}_rand_' + exp_param + f'trial={trial}_'
         sel_func = rand_subset_selection
         sel_func_param = [0, 200]
     elif sub_sel_func == 1:
-        filename_prefix = f'{dataset_name}_rand_bal_sub_selection_' + exp_param + f'trial={trial}_'
+        filename_prefix = f'{dataset_name}_rand_bal_' + exp_param + f'trial={trial}_'
         sel_func = rand_subset_selection
         sel_func_param = [1, 200]
     elif sub_sel_func == 2:
-        filename_prefix = f'{dataset_name}_rand_greedy_sub_selection_' + exp_param + f'num_iter={config["num_iter"]}_trial={trial}_'
+        filename_prefix = f'{dataset_name}_rand_greedy_' + exp_param + f'num_iter={config["num_iter"]}_trial={trial}_'
         sel_func = rand_greedy_subset_selection
         sel_func_param = [config['num_iter'], 200]
 
@@ -128,7 +130,7 @@ if __name__ == '__main__':
 
     # Start serial connection
     with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
-        board_init(ser)
+        device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])]) if config['host'] else board_init(ser)
 
         # Create log/txt directory if it doesn't exist
         log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
@@ -260,5 +262,9 @@ if __name__ == '__main__':
 
         # Write xml logs to file
         write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
+
+        # Kill the spawned process emulating the device
+        if config['host']:
+            device_emulation.terminate()
 
         print('Done!\n')

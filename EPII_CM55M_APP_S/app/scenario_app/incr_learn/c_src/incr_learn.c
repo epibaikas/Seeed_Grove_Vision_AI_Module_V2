@@ -4,176 +4,181 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include "powermode_export.h"
-
-#define WATCH_DOG_TIMEOUT_TH	(500) //ms
-
-#ifdef TRUSTZONE_SEC
-#ifdef FREERTOS
-/* Trustzone config. */
-//
-/* FreeRTOS includes. */
-//#include "secure_port_macros.h"
-#else
-#if (__ARM_FEATURE_CMSE & 1) == 0
-#error "Need ARMv8-M security extensions"
-#elif (__ARM_FEATURE_CMSE & 2) == 0
-#error "Compile with --cmse"
-#endif
-#include "arm_cmse.h"
-//#include "veneer_table.h"
-//
-#endif
-#endif
-
-#include "WE2_device.h"
-
-#include "spi_master_protocol.h"
-#include "hx_drv_spi.h"
-#include "spi_eeprom_comm.h"
-#include "board.h"
-#include "xprintf.h"
-#include "incr_learn.h"
-#include "board.h"
-#include "WE2_core.h"
-#include "hx_drv_scu.h"
-#include "hx_drv_swreg_aon.h"
-#include "hx_drv_uart.h"
-#ifdef IP_sensorctrl
-#include "hx_drv_sensorctrl.h"
-#endif
-#ifdef IP_xdma
-#include "hx_drv_xdma.h"
-#include "sensor_dp_lib.h"
-#endif
-#ifdef IP_cdm
-#include "hx_drv_cdm.h"
-#endif
-#ifdef IP_gpio
-#include "hx_drv_gpio.h"
-#endif
-#include "hx_drv_pmu_export.h"
-#include "hx_drv_pmu.h"
-#include "powermode.h"
-//#include "dp_task.h"
-#include "BITOPS.h"
-
-
-#include "event_handler.h"
-#include "memory_manage.h"
-#include "hx_drv_watchdog.h"
-#include <arm_math_types.h>
-#include <arm_math.h>
 #include "protocol_functions.h"
 #include "util_functions.h"
+#include "incr_learn.h"
+#include "xprintf.h"
 
-#ifdef EPII_FPGA
-#define DBG_APP_LOG             (1)
-#else
-#define DBG_APP_LOG             (0)
-#endif
-#if DBG_APP_LOG
-    #define dbg_app_log(fmt, ...)       xprintf(fmt, ##__VA_ARGS__)
-#else
-    #define dbg_app_log(fmt, ...)
-#endif
+#ifdef GROVE_VISION_WE2
+	#include "powermode_export.h"
+	#define WATCH_DOG_TIMEOUT_TH	(500) //ms
 
-#define TOTAL_STEP_TICK 1
-#define TOTAL_STEP_TICK_DBG_LOG 0
+	#ifdef TRUSTZONE_SEC
+		#ifdef FREERTOS
+		/* Trustzone config. */
+		//
+		/* FreeRTOS includes. */
+		//#include "secure_port_macros.h"
+		#else
+			#if (__ARM_FEATURE_CMSE & 1) == 0
+				#error "Need ARMv8-M security extensions"
+			#elif (__ARM_FEATURE_CMSE & 2) == 0
+				#error "Compile with --cmse"
+			#endif
+			#include "arm_cmse.h"
+		//#include "veneer_table.h"
+		//
+		#endif
+	#endif
 
-#if TOTAL_STEP_TICK
-#define CPU_CLK	0xffffff+1
-#endif
+	#include "WE2_device.h"
 
-void pinmux_init();
+	#include "spi_master_protocol.h"
+	#include "hx_drv_spi.h"
+	#include "spi_eeprom_comm.h"
+	#include "board.h"
+	#include "board.h"
+	#include "WE2_core.h"
+	#include "hx_drv_scu.h"
+	#include "hx_drv_swreg_aon.h"
+	#include "hx_drv_uart.h"
+	#ifdef IP_sensorctrl
+	#include "hx_drv_sensorctrl.h"
+	#endif
+	#ifdef IP_xdma
+	#include "hx_drv_xdma.h"
+	#include "sensor_dp_lib.h"
+	#endif
+	#ifdef IP_cdm
+	#include "hx_drv_cdm.h"
+	#endif
+	#ifdef IP_gpio
+	#include "hx_drv_gpio.h"
+	#endif
+	#include "hx_drv_pmu_export.h"
+	#include "hx_drv_pmu.h"
+	#include "powermode.h"
+	//#include "dp_task.h"
+	#include "BITOPS.h"
 
-/* Init SPI master pin mux (share with SDIO) */
-void spi_m_pinmux_cfg(SCU_PINMUX_CFG_T *pinmux_cfg)
-{
-	pinmux_cfg->pin_pb2 = SCU_PB2_PINMUX_SPI_M_DO_1;        /*!< pin PB2*/
-	pinmux_cfg->pin_pb3 = SCU_PB3_PINMUX_SPI_M_DI_1;        /*!< pin PB3*/
-	pinmux_cfg->pin_pb4 = SCU_PB4_PINMUX_SPI_M_SCLK_1;      /*!< pin PB4*/
-	pinmux_cfg->pin_pb11 = SCU_PB11_PINMUX_SPI_M_CS;        /*!< pin PB11*/
-}
 
-void uart_pinmux_cfg()
-{
-	// UART0 pin mux configuration
-	hx_drv_scu_set_PB0_pinmux(SCU_PB0_PINMUX_UART0_RX_1, 1);
-	hx_drv_scu_set_PB1_pinmux(SCU_PB1_PINMUX_UART0_TX_1, 1);
-}
+	#include "event_handler.h"
+	#include "memory_manage.h"
+	#include "hx_drv_watchdog.h"
+	#include <arm_math_types.h>
+	#include <arm_math.h>
 
-void pinmux_init()
-{
-	SCU_PINMUX_CFG_T pinmux_cfg;
+	#ifdef EPII_FPGA
+		#define DBG_APP_LOG             (1)
+	#else
+		#define DBG_APP_LOG             (0)
+	#endif
+	#if DBG_APP_LOG
+		#define dbg_app_log(fmt, ...)       xprintf(fmt, ##__VA_ARGS__)
+	#else
+		#define dbg_app_log(fmt, ...)
+	#endif
 
-	hx_drv_scu_get_all_pinmux_cfg(&pinmux_cfg);
+	#define TOTAL_STEP_TICK 1
+	#define TOTAL_STEP_TICK_DBG_LOG 0
+
+	#if TOTAL_STEP_TICK
+		#define CPU_CLK	0xffffff+1
+	#endif
+
+	void pinmux_init();
 
 	/* Init SPI master pin mux (share with SDIO) */
-	spi_m_pinmux_cfg(&pinmux_cfg);
+	void spi_m_pinmux_cfg(SCU_PINMUX_CFG_T *pinmux_cfg)
+	{
+		pinmux_cfg->pin_pb2 = SCU_PB2_PINMUX_SPI_M_DO_1;        /*!< pin PB2*/
+		pinmux_cfg->pin_pb3 = SCU_PB3_PINMUX_SPI_M_DI_1;        /*!< pin PB3*/
+		pinmux_cfg->pin_pb4 = SCU_PB4_PINMUX_SPI_M_SCLK_1;      /*!< pin PB4*/
+		pinmux_cfg->pin_pb11 = SCU_PB11_PINMUX_SPI_M_CS;        /*!< pin PB11*/
+	}
 
-	hx_drv_scu_set_all_pinmux_cfg(&pinmux_cfg, 1);
+	void uart_pinmux_cfg()
+	{
+		// UART0 pin mux configuration
+		hx_drv_scu_set_PB0_pinmux(SCU_PB0_PINMUX_UART0_RX_1, 1);
+		hx_drv_scu_set_PB1_pinmux(SCU_PB1_PINMUX_UART0_TX_1, 1);
+	}
 
-	/* Configure UART pin mux */
-	uart_pinmux_cfg();
-}
+	void pinmux_init()
+	{
+		SCU_PINMUX_CFG_T pinmux_cfg;
+
+		hx_drv_scu_get_all_pinmux_cfg(&pinmux_cfg);
+
+		/* Init SPI master pin mux (share with SDIO) */
+		spi_m_pinmux_cfg(&pinmux_cfg);
+
+		hx_drv_scu_set_all_pinmux_cfg(&pinmux_cfg, 1);
+
+		/* Configure UART pin mux */
+		uart_pinmux_cfg();
+	}
+#endif
 
 /*!
  * @brief Main function
  */
 int app_main(void) {
-
-	uint32_t wakeup_event;
-	uint32_t wakeup_event1;
-	uint32_t freq=0;
-
-	hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT, &wakeup_event);
-	hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT1, &wakeup_event1);
-
-    hx_drv_swreg_aon_get_pllfreq(&freq);
-    xprintf("wakeup_event=0x%x,WakeupEvt1=0x%x, freq=%d\n", wakeup_event, wakeup_event1, freq);
-
-    pinmux_init();
-
-#ifdef __GNU__
-	xprintf("__GNUC \n");
-	extern char __mm_start_addr__;
-	xprintf("__mm_start_addr__ address: %x\r\n",&__mm_start_addr__);
-	mm_set_initial((int)(&__mm_start_addr__), 0x00200000-((int)(&__mm_start_addr__)-0x34000000));
-#else
-	static uint8_t mm_start_addr __attribute__((section(".bss.mm_start_addr")));
-	xprintf("mm_start_addr address: %x \r\n",&mm_start_addr);
-	mm_set_initial((int)(&mm_start_addr), 0x00200000-((int)(&mm_start_addr)-0x34000000));
-#endif
-
-	uint8_t id_info = 2;
 	char line_buf[LINE_BUFFER_LEN];
 	char command_name[COMMAND_NAME_LEN];
 	int sscanf_ret_value;
 
 	int seq_num;
 	int seq_num_begin;
-	char *param;
+	char param[PARAM_LEN];
 
-	// Initialize eeprom
-	printf("Init EEPROM...\r\n");
-	hx_lib_spi_eeprom_open(USE_DW_SPI_MST_Q);
-	hx_lib_spi_eeprom_read_ID(USE_DW_SPI_MST_Q, &id_info);
-	printf("SPI ID info: %u\r\n", id_info);
-	xprintf("Init complete\r\n");
+	struct FunctionArguments fun_args;
 
-	// Create eeprom temporary buffers;
+	// Create eeprom temporary buffers - Not used when running code on host machine
 	static uint8_t eeprom_buffer[EEPROM_TEMP_BUFFER_SIZE] = {0};
 	static uint8_t eeprom_buffer_2[EEPROM_TEMP_BUFFER_SIZE] = {0};
 	static uint8_t eeprom_sector_buffer[EEPROM_SECTOR_SIZE] = {0};
 
-	struct FunctionArguments fun_args;
 	fun_args.eeprom_buffer = eeprom_buffer;
 	fun_args.eeprom_buffer_2 = eeprom_buffer_2;
 	fun_args.eeprom_sector_buffer = eeprom_sector_buffer;
+
 	fun_args.random_seed = 1;
 
-	xprintf("Board initialisation complete\r\n");
+	#ifdef GROVE_VISION_WE2
+		uint8_t id_info = 2;
+		uint32_t wakeup_event;
+		uint32_t wakeup_event1;
+		uint32_t freq=0;
+
+		hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT, &wakeup_event);
+		hx_drv_pmu_get_ctrl(PMU_pmu_wakeup_EVT1, &wakeup_event1);
+
+		hx_drv_swreg_aon_get_pllfreq(&freq);
+		xprintf("wakeup_event=0x%x,WakeupEvt1=0x%x, freq=%d\n", wakeup_event, wakeup_event1, freq);
+
+		pinmux_init();
+
+		#ifdef __GNU__
+			xprintf("__GNUC \n");
+			extern char __mm_start_addr__;
+			xprintf("__mm_start_addr__ address: %x\r\n",&__mm_start_addr__);
+			mm_set_initial((int)(&__mm_start_addr__), 0x00200000-((int)(&__mm_start_addr__)-0x34000000));
+		#else
+			static uint8_t mm_start_addr __attribute__((section(".bss.mm_start_addr")));
+			xprintf("mm_start_addr address: %x \r\n",&mm_start_addr);
+			mm_set_initial((int)(&mm_start_addr), 0x00200000-((int)(&mm_start_addr)-0x34000000));
+		#endif
+
+		// Initialize eeprom
+		printf("Init EEPROM...\r\n");
+		hx_lib_spi_eeprom_open(USE_DW_SPI_MST_Q);
+		hx_lib_spi_eeprom_read_ID(USE_DW_SPI_MST_Q, &id_info);
+		printf("SPI ID info: %u\r\n", id_info);
+		xprintf("Init complete\r\n");
+		xprintf("Board initialisation complete\r\n");
+	#endif
+
 	//-----------------------------------------------------
 
 	while(1) {

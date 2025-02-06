@@ -47,6 +47,14 @@ def read_config(config_dir_path, config_filename):
     if 'N_RAM_BUFFER' in config_values.keys():
         config_values['N_TOTAL'] = config_values['N_RAM_BUFFER'] + config_values['N_EEPROM_BUFFER']
 
+    if 'host' in config_values.keys():
+        if config_values['host']:
+            config_values['port'] = config_values['port_host']
+            config_values['baudrate'] = config_values['baudrate_host']
+        else:
+            config_values['port'] = config_values['port_grove_vision_we2']
+            config_values['baudrate'] = config_values['baudrate_grove_vision_we2']
+
     return config_values
 
 def get_loggers(req_log_file, resp_log_file, debug=False):
@@ -95,9 +103,11 @@ def write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_r
 
 def board_init(ser):
     board_init_complete = False
+    print('Waiting for board initialisation...')
     while not board_init_complete:
         line = ser.readline().decode()  # read a '\n' terminated line and convert it to string
-        if line == 'Board initialisation complete\r\r\n':
+        line = line.strip("\r\n")
+        if line == 'Board initialisation complete':
             print(line, end='')
             board_init_complete = True
 

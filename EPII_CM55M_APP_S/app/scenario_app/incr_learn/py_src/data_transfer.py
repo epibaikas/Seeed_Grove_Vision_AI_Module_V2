@@ -1,6 +1,7 @@
 import serial
 import numpy as np
 import os
+import subprocess
 
 from protocol_functions import *
 from util_functions import *
@@ -43,7 +44,7 @@ predicted_labels = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 optim_func_buffer = np.zeros(config['num_iter'], dtype=float)
 
 with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
-    board_init(ser)
+    device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])]) if config['host'] else board_init(ser)
 
     # Create log/txt directory if it doesn't exist
     log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
@@ -115,7 +116,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
     # Check correctness of read labels
     assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
-    send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[100, 200], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer])
+    send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[config['num_iter'], 200], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer])
     seq_num += 1
 
     # Check if predicted labels match the expected predicted labels
@@ -126,3 +127,7 @@ with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
         assert expected_predicted_labels[i] == predicted_labels[i]
 
     write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
+
+    # Kill the spawned process emulating the device
+    if config['host']:
+        device_emulation.terminate()
