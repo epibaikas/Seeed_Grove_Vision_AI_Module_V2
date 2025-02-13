@@ -43,6 +43,7 @@ def save_checkpoint(model, optimizer, dataloader_generator, best_val_top1_acc, e
         'dataloader_generator_state': dataloader_generator.get_state(),
         'best_val_top1_acc': best_val_top1_acc,
         'torch_rng_state': torch.get_rng_state(),
+        'torch_cuda_rng_state': torch.cuda.get_rng_state(),
         'numpy_rng_state': numpy.random.get_state(),
         'random_state': random.getstate()
     }
@@ -50,14 +51,15 @@ def save_checkpoint(model, optimizer, dataloader_generator, best_val_top1_acc, e
     torch.save(checkpoint, path)
     print(f'Checkpoint saved at epoch {epoch + 1} with best_val_top1_acc {best_val_top1_acc:.4f}')
 
-def load_checkpoint(model, optimizer, dataloader_generator, path):
-    checkpoint = torch.load(path)
+def load_checkpoint(model, optimizer, dataloader_generator, path, device):
+    checkpoint = torch.load(path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    dataloader_generator.set_state(checkpoint['dataloader_generator_state'])
+    dataloader_generator.set_state(checkpoint['dataloader_generator_state'].type(torch.ByteTensor))
     start_epoch = checkpoint['epoch'] + 1
     best_val_top1_acc = checkpoint['best_val_top1_acc']
-    torch.set_rng_state(checkpoint['torch_rng_state'])
+    torch.set_rng_state(checkpoint['torch_rng_state'].type(torch.ByteTensor))
+    torch.cuda.set_rng_state(checkpoint['torch_cuda_rng_state'].type(torch.ByteTensor))
     np.random.set_state(checkpoint['numpy_rng_state'])
     random.setstate(checkpoint['random_state'])
 
@@ -72,15 +74,6 @@ if __name__ == '__main__':
     config_net_training = read_config(config_dir_path, 'config_pretrain_mnetv2.ini')
     config |= config_net_training
 
-    # Login to wandb
-    os.environ['WANDB_API_KEY'] = '332e9e9bff737b8b2111932922ccdaa6aaafbaba'
-    wandb.login()
-    run = wandb.init(
-        project=f'{config["block_architecture"]}_{config["dataset"]}',
-        config=config_net_training
-    )
-
-
     random.seed(config['random_seed'])
     os.environ['PYTHONHASHSEED'] = str(config['random_seed'])
     np.random.seed(config['random_seed'])
@@ -88,6 +81,12 @@ if __name__ == '__main__':
     torch.cuda.manual_seed(config['random_seed'])
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    torch.use_deterministic_algorithms(True)
+
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -126,18 +125,27 @@ if __name__ == '__main__':
     else:
         config['augments'] = None
 
+    if not os.path.exists(config['results_dir_path']):
+        os.mkdir(config['results_dir_path'])
+
     checkpoint_path = os.path.join(config['results_dir_path'], f'{config["block_architecture"]}_{config["dataset"]}.pth')
 
     dataloader_generator = torch.Generator()
     if os.path.exists(checkpoint_path):
-        start_epoch, best_val_top1_acc = load_checkpoint(model, optimizer, dataloader_generator, checkpoint_path)
+        start_epoch, best_val_top1_acc = load_checkpoint(model, optimizer, dataloader_generator, checkpoint_path, device)
     else:
+        dataloader_generator.manual_seed(config['random_seed'])
         start_epoch = 0
         best_val_top1_acc = 0.0
 
     trainset, train_loader, val_loader = get_base_dataloader(config, dataloader_generator)
 
-    random.getstate()
+    # Login to wandb
+    os.environ["WANDB_MODE"] = 'offline'
+    run = wandb.init(
+        project=f'{config["block_architecture"]}_{config["dataset"]}',
+        config=config_net_training
+    )
 
     for epoch in range(start_epoch, config['max_train_iter']):
         epoch_loss_criterion = 0.0
@@ -148,7 +156,7 @@ if __name__ == '__main__':
 
         model.train(True)
 
-        for i, batch in tqdm(enumerate(train_loader), total=len(train_loader), desc='Batch'):
+        for i, batch in enumerate(train_loader):
 
             data, train_labels = [_.to(device, non_blocking=True) for _ in batch]
 

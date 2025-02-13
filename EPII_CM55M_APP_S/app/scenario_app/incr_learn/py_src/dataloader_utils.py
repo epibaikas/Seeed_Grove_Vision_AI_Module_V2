@@ -13,8 +13,8 @@ def get_base_dataloader(config, dataloader_generator):
                                         index=class_index, base_sess=True)
 
     trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=config['batch_size'], shuffle=True,
-                                              num_workers=8, pin_memory=True, generator=dataloader_generator)
+                                              num_workers=config['num_workers'], pin_memory=True, generator=dataloader_generator)
     testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=config['batch_size'], shuffle=False,
-                                             num_workers=8, pin_memory=True, generator=dataloader_generator)
+                                             num_workers=config['num_workers'], pin_memory=True, generator=dataloader_generator)
 
     return trainset, trainloader, testloader

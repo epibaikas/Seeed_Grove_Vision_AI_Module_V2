@@ -128,7 +128,7 @@ class CIFAR10(VisionDataset):
         targets_tmp = []
         for i in index:
             ind_cl = np.where(i == targets)[0]
-            if data_tmp == []:
+            if isinstance(data_tmp, list):
                 data_tmp = data[ind_cl]
                 targets_tmp = targets[ind_cl]
             else:
