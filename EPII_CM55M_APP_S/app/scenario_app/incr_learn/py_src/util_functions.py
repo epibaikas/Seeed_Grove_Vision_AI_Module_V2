@@ -47,14 +47,6 @@ def read_config(config_dir_path, config_filename):
     if 'N_RAM_BUFFER' in config_values.keys():
         config_values['N_TOTAL'] = config_values['N_RAM_BUFFER'] + config_values['N_EEPROM_BUFFER']
 
-    if 'host' in config_values.keys():
-        if config_values['host']:
-            config_values['port'] = config_values['port_host']
-            config_values['baudrate'] = config_values['baudrate_host']
-        else:
-            config_values['port'] = config_values['port_grove_vision_we2']
-            config_values['baudrate'] = config_values['baudrate_grove_vision_we2']
-
     return config_values
 
 def get_loggers(req_log_file, resp_log_file, debug=False):

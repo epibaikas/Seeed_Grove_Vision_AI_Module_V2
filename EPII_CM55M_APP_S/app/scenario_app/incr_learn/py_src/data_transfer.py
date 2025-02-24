@@ -43,91 +43,108 @@ subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
 predicted_labels = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 optim_func_buffer = np.zeros(config['num_iter'], dtype=float)
 
-with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
-    device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])]) if config['host'] else board_init(ser)
+# Create log/txt directory if it doesn't exist
+log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
+if not os.path.exists(log_txt_dir_path):
+    os.makedirs(log_txt_dir_path)
 
-    # Create log/txt directory if it doesn't exist
-    log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
-    if not os.path.exists(log_txt_dir_path):
-        os.makedirs(log_txt_dir_path)
+req_log_txt_file_path = os.path.join(log_txt_dir_path, 'requests_log.txt')
+resp_log_txt_file_path = os.path.join(log_txt_dir_path, 'responses_log.txt')
+req_logger, resp_logger = get_loggers(req_log_txt_file_path, resp_log_txt_file_path, debug=config['debug'])
 
-    req_log_txt_file_path = os.path.join(log_txt_dir_path, 'requests_log.txt')
-    resp_log_txt_file_path = os.path.join(log_txt_dir_path, 'responses_log.txt')
-    req_logger, resp_logger = get_loggers(req_log_txt_file_path, resp_log_txt_file_path, debug=config['debug'])
+# Create log/xml directory if it doesn't exist
+log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
+if not os.path.exists(log_xml_dir_path):
+    os.makedirs(log_xml_dir_path)
 
-    # Create log/xml directory if it doesn't exist
-    log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
-    if not os.path.exists(log_xml_dir_path):
-        os.makedirs(log_xml_dir_path)
+req_log_xml_file_path = os.path.join(log_xml_dir_path, 'requests_log.xml')
+resp_log_xml_file_path = os.path.join(log_xml_dir_path, 'responses_log.xml')
 
-    req_log_xml_file_path = os.path.join(log_xml_dir_path, 'requests_log.xml')
-    resp_log_xml_file_path = os.path.join(log_xml_dir_path, 'responses_log.xml')
+# Create root elements
+req_log_xml_root = ET.Element('requests')
+resp_log_xml_root = ET.Element('response_log')
 
-    # Create root elements
-    req_log_xml_root = ET.Element('requests')
-    resp_log_xml_root = ET.Element('response_log')
+util = {'req_logger': req_logger,
+        'resp_logger': resp_logger,
+        'req_log_xml_root': req_log_xml_root,
+        'resp_log_xml_root': resp_log_xml_root,
+        'debug': config['debug']}
 
-    util = {'ser': ser,
-            'req_logger': req_logger,
-            'resp_logger': resp_logger,
-            'req_log_xml_root': req_log_xml_root,
-            'resp_log_xml_root': resp_log_xml_root,
-            'debug': config['debug']}
+if config['host']:
+    device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])],
+                                        stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        text=False)
+    util['writer'] = device_emulation.stdin
+    util['reader'] = device_emulation.stdout
+else:
+    # Start serial connection
+    ser = serial.Serial(config['port'], config['baudrate'], timeout=None)
+    board_init(ser)
+    util['writer'] = ser
+    util['reader'] = ser
 
-    seq_num = 0
-    command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[config['random_seed']], util=util)
-    seq_num += 1
+seq_num = 0
+command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[config['random_seed']], util=util)
+seq_num += 1
 
-    command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
-                                        config['N_EEPROM_BUFFER'], config['bytes_per_example'], num_of_classes], util=util)
-    seq_num += 1
+command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
+                                    config['N_EEPROM_BUFFER'], config['bytes_per_example'], num_of_classes], util=util)
+seq_num += 1
 
-    for i in range(config['N_TOTAL']):
-        if i < config['N_RAM_BUFFER']:
-            send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util, data_in=img_data[i])
-            seq_num += 1
-            send_command(read_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line'], config['bytes_per_example']], util=util, data_out=data_read_buffer)
-            seq_num += 1
-            assert np.array_equal(img_data[i], data_read_buffer)
+for i in range(config['N_TOTAL']):
+    if i < config['N_RAM_BUFFER']:
+        send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util, data_in=img_data[i])
+        seq_num += 1
+        send_command(read_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line'], config['bytes_per_example']], util=util, data_out=data_read_buffer)
+        seq_num += 1
+        assert np.array_equal(img_data[i], data_read_buffer)
 
-        else:
-            send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line']], util=util, data_in=img_data[i])
-            seq_num += 1
-            send_command(read_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_example']], util=util, data_out=data_read_buffer)
-            seq_num += 1
-            assert np.array_equal(img_data[i], data_read_buffer)
+    else:
+        send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line']], util=util, data_in=img_data[i])
+        seq_num += 1
+        send_command(read_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_example']], util=util, data_out=data_read_buffer)
+        seq_num += 1
+        assert np.array_equal(img_data[i], data_read_buffer)
 
-    send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
-    seq_num += 1
+send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
+seq_num += 1
 
-    send_command(read_dist_matrix, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=dist_array)
-    seq_num += 1
+send_command(read_dist_matrix, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=dist_array)
+seq_num += 1
 
-    # Check correctness of distance calculations
-    for i in range(config['N_TOTAL']):
-        for j in range(i, config['N_TOTAL']):
-            idx = get_symmetric_2D_array_index(dist_array_size, i, j)
-            print('i={}, j={}, idx={}, {}, {}'.format(i, j, idx, expected_classifier.dists[i, j], dist_array[idx]))
-            assert expected_classifier.dists[i, j] == dist_array[idx]
+# Check correctness of distance calculations
+for i in range(config['N_TOTAL']):
+    for j in range(i, config['N_TOTAL']):
+        idx = get_symmetric_2D_array_index(dist_array_size, i, j)
+        print('i={}, j={}, idx={}, {}, {}'.format(i, j, idx, expected_classifier.dists[i, j], dist_array[idx]))
+        assert expected_classifier.dists[i, j] == dist_array[idx]
 
-    send_command(read_labels_buffer, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=labels_buffer)
-    seq_num += 1
+send_command(read_labels_buffer, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=labels_buffer)
+seq_num += 1
 
-    # Check correctness of read labels
-    assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
+# Check correctness of read labels
+assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
-    send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[config['num_iter'], 200], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer])
-    seq_num += 1
+send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[config['num_iter'], 200], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer])
+seq_num += 1
 
-    # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=3)
+# Check if predicted labels match the expected predicted labels
+expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=3)
 
-    for i, _ in enumerate(predicted_labels):
-        print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))
-        assert expected_predicted_labels[i] == predicted_labels[i]
+for i, _ in enumerate(predicted_labels):
+    print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))
+    assert expected_predicted_labels[i] == predicted_labels[i]
 
-    write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
+write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
 
-    # Kill the spawned process emulating the device
-    if config['host']:
-        device_emulation.terminate()
+# Kill the spawned process emulating the device
+if config['host']:
+    device_emulation.stdin.close()
+    device_emulation.stdout.close()
+    device_emulation.stderr.close()
+    device_emulation.terminate()
+    device_emulation.wait()
+
+print('Done!\n')

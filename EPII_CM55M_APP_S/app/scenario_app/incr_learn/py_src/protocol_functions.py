@@ -32,9 +32,11 @@ def send_command(command_name, seq_num, param_list, util, data_in=None, data_out
         else:
             data_in_xml.text = str(data_in)
 
-    util['ser'].write(req_msg.encode())
+    util['writer'].write((req_msg + '\n').encode())
+    util['writer'].flush()
+
     req_start_time_xml.text = str(dt.now())
-    ack_line = util['ser'].readline().decode()
+    ack_line = util['reader'].readline().decode()
     debug_print(ack_line, end='', debug=util['debug'])
     util['resp_logger'].info(ack_line.rstrip())
 
@@ -55,11 +57,13 @@ def send_command(command_name, seq_num, param_list, util, data_in=None, data_out
         command_return_value = command_name(param_list, util)
 
     req_msg = 'end {}\r'.format(seq_num)
-    util['ser'].write(req_msg.encode())
+    util['writer'].write((req_msg + '\n').encode())
+    util['writer'].flush()
+
     util['req_logger'].info(req_msg + '\n')
     req_end_time_xml.text = str(dt.now())
 
-    ack_line = util['ser'].readline().decode()
+    ack_line = util['reader'].readline().decode()
     debug_print(ack_line, debug=util['debug'])
     util['resp_logger'].info(ack_line)
 
@@ -133,7 +137,7 @@ def read_labels_buffer(param_list, labels_array, util):
 
 
 def compute_dist_matrix(param_list, util):
-    resp_line = util['ser'].readline().decode()
+    resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
@@ -164,7 +168,7 @@ def rand_subset_selection(param_list, data_out, util):
 
     read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
 
-    resp_line = util['ser'].readline().decode()
+    resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
@@ -174,7 +178,7 @@ def rand_subset_selection(param_list, data_out, util):
 
     read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
 
-    resp_line = util['ser'].readline().decode()
+    resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
@@ -195,14 +199,14 @@ def rand_greedy_subset_selection(param_list, data_out, util):
     # debugging ----------------------------------------------
     # Prints the iterations of the greedy process
     for i in range(num_iter):
-        resp_line = util['ser'].readline().decode()
+        resp_line = util['reader'].readline().decode()
         debug_print(resp_line, end='', debug=util['debug'])
         util['resp_logger'].info(resp_line.rstrip())
     # --------------------------------------------------------
 
     read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
 
-    resp_line = util['ser'].readline().decode()
+    resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
@@ -212,7 +216,7 @@ def rand_greedy_subset_selection(param_list, data_out, util):
 
     read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
 
-    resp_line = util['ser'].readline().decode()
+    resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
@@ -222,7 +226,54 @@ def rand_greedy_subset_selection(param_list, data_out, util):
 
     read_buffer(data_out[2], data_out[2].shape[0], num_per_line, util)
 
-    resp_line = util['ser'].readline().decode()
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'optim_func_buffer_read_done':
+        raise AssertionError('resp_line not properly received for optim_func_buffer')
+
+    return 0
+
+def evo_subset_selection(param_list, data_out, util):
+    if len(param_list) != 2:
+        raise AssertionError('Incorrect param_list length')
+
+    num_gen = param_list[0]
+    num_per_line = param_list[1]
+
+    # debugging ----------------------------------------------
+    # Prints the iterations of the greedy process
+    for i in range(num_gen):
+        resp_line = util['reader'].readline().decode()
+        debug_print(resp_line, end='', debug=util['debug'])
+        util['resp_logger'].info(resp_line.rstrip())
+    # --------------------------------------------------------
+
+    read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
+
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'subset_idxs_read_done':
+        raise AssertionError('resp_line not properly received for subset_idxs read')
+
+    read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
+
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != 'predicted_labels_read_done':
+        raise AssertionError('resp_line not properly received for predicted_labels')
+
+    read_buffer(data_out[2], data_out[2].shape[0], num_per_line, util)
+
+    resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 
@@ -239,10 +290,12 @@ def write_buffer(data, size, num_per_line, util):
         else:
             req_msg = ' '.join(['{:3d}'.format(data[i + j]) for j in range(size - i)]) + ' \r'
 
-        util['ser'].write(req_msg.encode())
+        util['writer'].write((req_msg + '\n').encode())
+        util['writer'].flush()
+
         util['req_logger'].debug(req_msg)
 
-        ack_line = util['ser'].readline().decode()
+        ack_line = util['reader'].readline().decode()
         debug_print(ack_line, end='', debug=util['debug'])
         util['resp_logger'].debug(ack_line.rstrip())
 
@@ -253,7 +306,7 @@ def write_buffer(data, size, num_per_line, util):
 
 def read_buffer(array, size, num_per_line, util):
     for i in range(0, size, num_per_line):
-        ack_line = util['ser'].readline().decode()
+        ack_line = util['reader'].readline().decode()
         debug_print(ack_line, end='', debug=util['debug'])
         util['resp_logger'].debug(ack_line.rstrip())
 
@@ -269,7 +322,9 @@ def read_buffer(array, size, num_per_line, util):
         else:
             ack_msg = 'ack {}\r'.format(i + num_per_line)
 
-        util['ser'].write(ack_msg.encode())
+        util['writer'].write((ack_msg + '\n').encode())
+        util['writer'].flush()
+
         util['req_logger'].debug(ack_msg)
 
 
@@ -278,7 +333,7 @@ def set_data_buffer_parameters(param_list, util):
         raise AssertionError('Incorrect param_list length')
 
     for i in range(13):
-        resp_line = util['ser'].readline().decode()
+        resp_line = util['reader'].readline().decode()
         debug_print(resp_line, end='', debug=util['debug'])
         util['resp_logger'].info(resp_line.rstrip())
 
@@ -290,7 +345,7 @@ def set_random_seed(param_list, util):
 
     random_seed = param_list[0]
 
-    resp_line = util['ser'].readline().decode()
+    resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())
 

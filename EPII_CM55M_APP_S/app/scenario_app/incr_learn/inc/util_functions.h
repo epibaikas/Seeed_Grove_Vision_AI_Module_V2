@@ -9,6 +9,8 @@ struct FunctionArguments;
   #include "platform/grove_vision_we2/util_functions_grove_vision_we2.h"
 #endif
 
+uint16_t** allocate_2D_array(uint32_t dim_0, uint32_t dim_1, char* array_name);
+void free_2D_array(uint16_t** array, uint32_t dim_0);
 uint16_t* allocate_symmetric_2D_array(uint32_t N);
 void set_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, uint32_t j, uint16_t value);
 uint16_t get_symmetric_2D_array_value(uint16_t *array, uint32_t N, uint32_t i, uint32_t j);
@@ -20,6 +22,9 @@ void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct Functi
 
 int compare_subset_indices(const void *a, const void *b);
 int compare_indices(void *arr, const void *a, const void *b);
+int compare_indices_uint8(void *arr, const void *a, const void *b);
+int compare_indices_float_array(void *arr, const void *a, const void *b);
+
 uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k, struct FunctionArguments *fun_args);
 uint8_t find_max_index(uint8_t *array, size_t size);
 
@@ -30,6 +35,10 @@ uint8_t get_num_of_available_classes(uint8_t *labels, struct FunctionArguments *
 void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_idxs, uint8_t* predicted_labels);
 float get_avg_class_acc(uint8_t *labels, uint8_t *predicted_labels, struct FunctionArguments *fun_args);
 uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels, struct FunctionArguments *fun_args);
+
+void steady_state_parent_selection(uint16_t** population, uint32_t population_size, uint16_t** parents, uint32_t num_parents, uint8_t* max_fitness_idxs, struct FunctionArguments *fun_args);
+void single_point_crossover(uint16_t* par_1, uint16_t* par_2, uint16_t* offspring, struct  FunctionArguments *fun_args);
 void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, struct FunctionArguments *fun_args);
+
 void float_to_string(float num, char *str, int precision);
 #endif

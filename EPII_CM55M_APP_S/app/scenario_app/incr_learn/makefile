@@ -3,7 +3,7 @@ CC = gcc
 INCDIR = inc
 INCDIR += inc/platform/host
 
-CFLAGS = -Wall
+CFLAGS = -g -Wall
 CFLAGS += -DHOST_PLATFORM 
 CFLAGS += $(addprefix -I, $(INCDIR))
 

@@ -37,6 +37,7 @@ void read_labels_buffer(struct FunctionArguments *fun_args);
 void read_dist_matrix(struct FunctionArguments *fun_args);
 void rand_subset_selection(struct FunctionArguments *fun_args);
 void rand_greedy_subset_selection(struct FunctionArguments *fun_args);
+void evo_subset_selection(struct FunctionArguments *fun_args);
 
 void set_data_buffer_parameters(struct FunctionArguments *fun_args);
 void set_random_seed(struct FunctionArguments *fun_args);

@@ -12,9 +12,6 @@
 	#define APP_BLOCK_FUNC() do{ \
 		__asm volatile("b    .");\
 		}while(0)
-#elif HOST_PLATFORM
-	#define SERIAL_PORT "/dev/ttys008"
-	#define BAUDRATE 115200
 #endif
 
 #define EEPROM_TEMP_BUFFER_SIZE 1024

@@ -1,12 +1,43 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <math.h>
 #include "xprintf.h"
 #include "incr_learn.h"
 #include "util_functions.h"
 #include "protocol_functions.h"
+
+uint16_t** allocate_2D_array(uint32_t dim_0, uint32_t dim_1, char* array_name) {
+    uint16_t **array = (uint16_t **)calloc(dim_0, sizeof(uint16_t *));
+	if (array == NULL) {
+		xprintf("mem_error: memory allocation for %s failed\r\n", array_name);
+		exit(1);
+	}
+
+	for (int i = 0; i < dim_0; i++) {
+		array[i] = (uint16_t *)calloc(dim_1, sizeof(uint16_t));
+		if (array[i] == NULL) {
+			xprintf("mem_error: memory allocation for %s[%d] failed\r\n", array_name, i);
+			exit(1);
+		}
+	}
+
+    return array;
+}
+
+void free_2D_array(uint16_t** array, uint32_t dim_0) {
+    if (array == NULL) return;
+    
+    // Free every row
+    for (int i = 0; i < dim_0; i++) {
+        free(array[i]);
+    }
+
+    // Free the array of pointers
+    free(array);
+}
 
 uint16_t* allocate_symmetric_2D_array(uint32_t N) {
     // Number of elements in the upper triangle of the symmetric matrix including diagonal
@@ -155,6 +186,26 @@ int compare_indices(void *arr, const void *a, const void *b) {
     return idx1 - idx2;
 }
 
+// Comparator function for stable argsort - uint8_t - ascending
+int compare_indices_uint8(void *arr, const void *a, const void *b) {
+    uint8_t *array = (uint8_t *)arr;
+    uint16_t idx1 = *(const uint16_t *)a;
+    uint16_t idx2 = *(const uint16_t *)b;
+    if (array[idx1] < array[idx2]) return -1;
+    if (array[idx1] > array[idx2]) return 1;
+    return idx1 - idx2;
+}
+
+// Comparator function for stable argsort - float - descending
+int compare_indices_float_array(void *arr, const void *a, const void *b) {
+    float *array = (float *)arr;
+    uint8_t idx1 = *(const uint8_t *)a;
+    uint8_t idx2 = *(const uint8_t *)b;
+    if (array[idx1] < array[idx2]) return 1;
+    if (array[idx1] > array[idx2]) return -1;
+    return idx1 - idx2;
+}
+
 uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k, struct FunctionArguments *fun_args) {
     uint8_t *label_counts = (uint8_t *)calloc(fun_args->num_of_classes, sizeof(uint8_t));
     if (label_counts == NULL) {
@@ -234,6 +285,8 @@ void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size, int nu
     float *buf_float;
     char float_str[10];
 
+    size_t len = 0;
+
     if (element_size == sizeof(uint8_t)) {
         buf8 = (uint8_t *)buffer;
     } else if (element_size == sizeof(uint16_t)) {
@@ -256,10 +309,12 @@ void read_buffer(void* buffer, uint32_t buffer_size, size_t element_size, int nu
             xprintf("\r\n");
             xgets(line_buf, LINE_BUFFER_LEN);
 
+            len = strlen(line_buf);
+
             strcpy(ack_str, "ack ");
             sprintf(idx_str, "%d", i+1);
             strcat(ack_str, idx_str);
-            if (strcmp(line_buf, ack_str) != 0) {
+            if (strncmp(line_buf, ack_str, len) != 0) {
                 xprintf("ack_error: read acknowledge not properly received\r\n");
                 xprintf("line_buf: %s, ack_str: %s\r\n", line_buf, ack_str);
                 exit(1);
@@ -345,7 +400,7 @@ void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_
         for (size_t i = 0; i < fun_args->eeprom_buffer_size; i++) {
             indices[i] = i;
         }
-        // Get the indices that short temp_dist_buf in ascending distance order
+        // Get the indices that sort temp_dist_buf in ascending distance order
         qsort_r(indices, fun_args->eeprom_buffer_size, sizeof(uint16_t), (void *) temp_dist_buf, compare_indices);
 
         // Convert the indices to the corresponding subset_idxs
@@ -404,6 +459,43 @@ uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels, struct
     return num_correct;
 }
 
+void steady_state_parent_selection(uint16_t** population, uint32_t population_size, uint16_t** parents, uint32_t num_parents, uint8_t* max_fitness_idxs, struct FunctionArguments *fun_args) {
+    for (int i = 0; i < num_parents; i++) {
+        memcpy(parents[i], population[max_fitness_idxs[i]], fun_args->eeprom_buffer_size * sizeof(uint16_t));
+    }
+}
+
+void single_point_crossover(uint16_t* par_1, uint16_t* par_2, uint16_t* offspring, struct  FunctionArguments *fun_args) {
+    int crossover_idx = rand() % fun_args->eeprom_buffer_size;
+
+    if  (par_1[crossover_idx] < par_2[crossover_idx]) {
+        memcpy(offspring, par_1, crossover_idx * sizeof(uint16_t));
+        memcpy(&offspring[crossover_idx], &par_2[crossover_idx], (fun_args->eeprom_buffer_size - crossover_idx) * sizeof(uint16_t));
+    } else {
+        memcpy(offspring, par_2, crossover_idx * sizeof(uint16_t));
+        memcpy(&offspring[crossover_idx], &par_1[crossover_idx], (fun_args->eeprom_buffer_size - crossover_idx) * sizeof(uint16_t));
+    }
+
+    // xprintf("Crossover index: %d\r\n", crossover_idx);
+    // xprintf("par1: ");
+    // for (int i = 0; i < fun_args->eeprom_buffer_size; i++) {
+    //     xprintf("%u ", par_1[i]);
+    // }
+    // xprintf("\r\n");
+
+    // xprintf("par2: ");
+    // for (int i = 0; i < fun_args->eeprom_buffer_size; i++) {
+    //     xprintf("%u ", par_2[i]);
+    // }
+    // xprintf("\r\n");
+
+    // xprintf("offs: ");
+    // for (int i = 0; i < fun_args->eeprom_buffer_size; i++) {
+    //     xprintf("%u ", offspring[i]);
+    // }
+    // xprintf("\r\n");
+}
+
 void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, struct FunctionArguments *fun_args) {    
     int idx = 0;
     uint32_t num_of_idxs_to_be_mutated = floor(mutation_rate * fun_args->eeprom_buffer_size);
@@ -460,6 +552,12 @@ void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_ra
       }
 
     }
+
+    // xprintf("mutated offs: ");
+    // for (int i = 0; i < fun_args->eeprom_buffer_size; i++) {
+    //     xprintf("%u ", subset_idxs[i]);
+    // }
+    // xprintf("\r\n\r\n");
 
     free(in_subset);
     free(idxs_not_in_subset);

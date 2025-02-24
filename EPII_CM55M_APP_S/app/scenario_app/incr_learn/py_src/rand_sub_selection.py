@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('dataset', type=str, help='The name of the dataset to be used')
     parser.add_argument('sub_sel_func', type=int, help='Subset selection function (\'0\' for random '
                                                        'selection, \'1\' for random balanced selection, \'2\' for '
-                                                       'random greedy')
+                                                       'random greedy, \'3\' for evolutionary')
     parser.add_argument('seq', type=str,
                         help='Enter \'high\' or  \'low\' for high\low accuracy sequence of classes respectively')
     parser.add_argument('trial', type=positive_int,
@@ -97,6 +97,11 @@ if __name__ == '__main__':
         filename_prefix = f'{dataset_name}_rand_greedy_' + exp_param + f'num_iter={config["num_iter"]}_trial={trial}_'
         sel_func = rand_greedy_subset_selection
         sel_func_param = [config['num_iter'], 200]
+    elif sub_sel_func == 3:
+        filename_prefix = f'{dataset_name}_evo_' + exp_param + f'num_gen={config["num_gen"]}_trial={trial}_'
+        sel_func = evo_subset_selection
+        sel_func_param = [config['num_gen'], 200]
+
 
     # Class sequence
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
@@ -128,143 +133,158 @@ if __name__ == '__main__':
     # training set
     EEPROM_trainset_idxs = np.zeros(shape=(len(class_seq) - 1, config['N_EEPROM_BUFFER']), dtype=np.uint16)
 
-    # Start serial connection
-    with serial.Serial(config['port'], config['baudrate'], timeout=None) as ser:
-        device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])]) if config['host'] else board_init(ser)
+    # Create log/txt directory if it doesn't exist
+    log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
+    if not os.path.exists(log_txt_dir_path):
+        os.makedirs(log_txt_dir_path)
 
-        # Create log/txt directory if it doesn't exist
-        log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
-        if not os.path.exists(log_txt_dir_path):
-            os.makedirs(log_txt_dir_path)
+    req_log_txt_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'requests_log.txt')
+    resp_log_txt_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'responses_log.txt')
+    req_logger, resp_logger = get_loggers(req_log_txt_file_path, resp_log_txt_file_path, debug=config['debug'])
 
-        req_log_txt_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'requests_log.txt')
-        resp_log_txt_file_path = os.path.join(log_txt_dir_path, filename_prefix + 'responses_log.txt')
-        req_logger, resp_logger = get_loggers(req_log_txt_file_path, resp_log_txt_file_path, debug=config['debug'])
+    # Create log/xml directory if it doesn't exist
+    log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
+    if not os.path.exists(log_xml_dir_path):
+        os.makedirs(log_xml_dir_path)
 
-        # Create log/xml directory if it doesn't exist
-        log_xml_dir_path = os.path.join(config['log_dir_path'], 'xml')
-        if not os.path.exists(log_xml_dir_path):
-            os.makedirs(log_xml_dir_path)
+    req_log_xml_file_path = os.path.join(log_xml_dir_path, filename_prefix + 'requests_log.xml')
+    resp_log_xml_file_path = os.path.join(log_xml_dir_path, filename_prefix + 'responses_log.xml')
 
-        req_log_xml_file_path = os.path.join(log_xml_dir_path, filename_prefix + 'requests_log.xml')
-        resp_log_xml_file_path = os.path.join(log_xml_dir_path, filename_prefix + 'responses_log.xml')
+    # Create root elements
+    req_log_xml_root = ET.Element('requests')
+    resp_log_xml_root = ET.Element('response_log')
 
-        # Create root elements
-        req_log_xml_root = ET.Element('requests')
-        resp_log_xml_root = ET.Element('response_log')
+    util = {'req_logger': req_logger,
+            'resp_logger': resp_logger,
+            'req_log_xml_root': req_log_xml_root,
+            'resp_log_xml_root': resp_log_xml_root,
+            'debug': config['debug']}
 
-        util = {'ser': ser,
-                'req_logger': req_logger,
-                'resp_logger': resp_logger,
-                'req_log_xml_root': req_log_xml_root,
-                'resp_log_xml_root': resp_log_xml_root,
-                'debug': config['debug']}
+    if config['host']:
+        device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])],
+                                            stdin=subprocess.PIPE,
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE,
+                                            text=False)
+        util['writer'] = device_emulation.stdin
+        util['reader'] = device_emulation.stdout
+    else:
+        # Start serial connection
+        ser = serial.Serial(config['port'], config['baudrate'], timeout=None)
+        board_init(ser)
+        util['writer'] = ser
+        util['reader'] = ser
 
-        # Set random seed ----------------------------------------------------------------------------------------------
-        send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed], util=util)
+
+    # Set random seed ----------------------------------------------------------------------------------------------
+    send_command(set_random_seed, seq_num=seq_num, param_list=[random_seed], util=util)
+    seq_num += 1
+
+    # Set data buffer parameters -----------------------------------------------------------------------------------
+    send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
+                                                                          config['N_EEPROM_BUFFER'],
+                                                                          config['bytes_per_example'],
+                                                                          num_of_classes], util=util)
+    seq_num += 1
+
+    # Prime EEPROM with examples from the 1st class ----------------------------------------------------------------
+    class_idxs = get_class_example_indices(train_set, class_seq[0])
+    class_subset_idxs = np.random.choice(class_idxs, config['N_EEPROM_BUFFER'], replace=False)
+    device_data_idxs[config['N_RAM_BUFFER'] : config['N_TOTAL']] = class_subset_idxs
+
+    print('Priming EEPROM with examples from 1st class...')
+    for i in tqdm(range(config['N_RAM_BUFFER'], config['N_TOTAL']), file=sys.stdout):
+        data_example = train_data[class_subset_idxs[i - config['N_RAM_BUFFER']]]
+        device_data[i] = data_example
+
+        send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']),
+                    config['num_per_line']], util=util, data_in=data_example)
         seq_num += 1
 
-        # Set data buffer parameters -----------------------------------------------------------------------------------
-        send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
-                                                                              config['N_EEPROM_BUFFER'],
-                                                                              config['bytes_per_example'],
-                                                                              num_of_classes], util=util)
-        seq_num += 1
+    # Write examples for next class in the sequence to RAM buffer, perform subset selection and --------------------
+    # repeat for new classes
+    for t in range(1, len(class_seq)):
+        class_idxs = get_class_example_indices(train_set, class_seq[t])
+        class_subset_idxs = np.random.choice(class_idxs, config['N_RAM_BUFFER'], replace=False)
+        device_data_idxs[0:config['N_RAM_BUFFER']] = class_subset_idxs
 
-        # Prime EEPROM with examples from the 1st class ----------------------------------------------------------------
-        class_idxs = get_class_example_indices(train_set, class_seq[0])
-        class_subset_idxs = np.random.choice(class_idxs, config['N_EEPROM_BUFFER'], replace=False)
-        device_data_idxs[config['N_RAM_BUFFER'] : config['N_TOTAL']] = class_subset_idxs
-
-        print('Priming EEPROM with examples from 1st class...')
-        for i in tqdm(range(config['N_RAM_BUFFER'], config['N_TOTAL']), file=sys.stdout):
-            data_example = train_data[class_subset_idxs[i - config['N_RAM_BUFFER']]]
+        print(f'Writing examples from class {t+1}...')
+        for i in tqdm(range(config['N_RAM_BUFFER']), file=sys.stdout):
+            data_example = train_data[class_subset_idxs[i]]
             device_data[i] = data_example
 
-            send_command(write_eeprom, seq_num=seq_num, param_list=[(i - config['N_RAM_BUFFER']),
-                        config['num_per_line']], util=util, data_in=data_example)
+            send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util,
+                         data_in=data_example)
             seq_num += 1
 
-        # Write examples for next class in the sequence to RAM buffer, perform subset selection and --------------------
-        # repeat for new classes
-        for t in range(1, len(class_seq)):
-            class_idxs = get_class_example_indices(train_set, class_seq[t])
-            class_subset_idxs = np.random.choice(class_idxs, config['N_RAM_BUFFER'], replace=False)
-            device_data_idxs[0:config['N_RAM_BUFFER']] = class_subset_idxs
+        # Compute dist matrix
+        print('\tComputing distance matrix...')
+        send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
+        seq_num += 1
 
-            print(f'Writing examples from class {t+1}...')
-            for i in tqdm(range(config['N_RAM_BUFFER']), file=sys.stdout):
-                data_example = train_data[class_subset_idxs[i]]
-                device_data[i] = data_example
+        # Run subset selection
+        print('\tRunning subset selection...')
+        send_command(sel_func, seq_num=seq_num, param_list=sel_func_param, util=util,
+                     data_out=[subset_idxs, predicted_labels, optim_func_buffer])
+        seq_num += 1
 
-                send_command(write_ram_buffer, seq_num=seq_num, param_list=[i, config['num_per_line']], util=util,
-                             data_in=data_example)
-                seq_num += 1
+        # Check that the predicted labels returned by the device match the expected ones
+        expected_classifier = kNearestNeighbors(device_data[:, 0:config['data_bytes_per_example']], device_data[:, config['data_bytes_per_example']])
+        expected_classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
 
-            # Compute dist matrix
-            print('\tComputing distance matrix...')
-            send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
-            seq_num += 1
+        expected_predicted_labels = expected_classifier.predict(device_data[:, 0:config['data_bytes_per_example']],
+                                    subset_idxs, train_classifier=False, k=3)
+        assert np.array_equal(expected_predicted_labels, predicted_labels)
 
-            # Run subset selection
-            print('\tRunning subset selection...')
-            send_command(sel_func, seq_num=seq_num, param_list=sel_func_param, util=util,
-                         data_out=[subset_idxs, predicted_labels, optim_func_buffer])
-            seq_num += 1
+        # Update device_data to mirror the data in EEPROM
+        subset_idxs.sort()
+        subset_idxs_set = set(subset_idxs)
+        EEPROM_idxs = set(range(config['N_RAM_BUFFER'], config['N_TOTAL']))
+        EEPROM_idxs_to_be_replaced = list(EEPROM_idxs - EEPROM_idxs.intersection(subset_idxs_set))
+        EEPROM_idxs_to_be_replaced.sort()
 
-            # Check that the predicted labels returned by the device match the expected ones
-            expected_classifier = kNearestNeighbors(device_data[:, 0:config['data_bytes_per_example']], device_data[:, config['data_bytes_per_example']])
-            expected_classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
+        RAM_idxs = [i for i in subset_idxs if i < config['N_RAM_BUFFER']]
+        assert len(RAM_idxs) == len(EEPROM_idxs_to_be_replaced)
 
-            expected_predicted_labels = expected_classifier.predict(device_data[:, 0:config['data_bytes_per_example']],
-                                        subset_idxs, train_classifier=False, k=3)
-            assert np.array_equal(expected_predicted_labels, predicted_labels)
+        for i, idx in enumerate(RAM_idxs):
+            device_data[EEPROM_idxs_to_be_replaced[i], :] = device_data[idx, :]
+            device_data_idxs[EEPROM_idxs_to_be_replaced[i]] = device_data_idxs[idx]
 
-            # Update device_data to mirror the data in EEPROM
-            subset_idxs.sort()
-            subset_idxs_set = set(subset_idxs)
-            EEPROM_idxs = set(range(config['N_RAM_BUFFER'], config['N_TOTAL']))
-            EEPROM_idxs_to_be_replaced = list(EEPROM_idxs - EEPROM_idxs.intersection(subset_idxs_set))
-            EEPROM_idxs_to_be_replaced.sort()
+        EEPROM_trainset_idxs[t-1, :] = device_data_idxs[config['N_RAM_BUFFER']:]
 
-            RAM_idxs = [i for i in subset_idxs if i < config['N_RAM_BUFFER']]
-            assert len(RAM_idxs) == len(EEPROM_idxs_to_be_replaced)
+        test_set_union = []
+        for i in range(t):
+            # Evaluate top-1 accuracy on the test set from each stage using the current subset of examples in EEPROM
+            acc_matrix[t - 1, i] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1, :], test_subset_idxs=test_sets[i])
+            test_set_union += test_sets[i]
 
-            for i, idx in enumerate(RAM_idxs):
-                device_data[EEPROM_idxs_to_be_replaced[i], :] = device_data[idx, :]
-                device_data_idxs[EEPROM_idxs_to_be_replaced[i]] = device_data_idxs[idx]
+        # Evaluate top-1 accuracy over the union of all test sets from the classes available up to this stage
+        acc_test_set_union[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1, :], test_subset_idxs=test_set_union)
 
-            EEPROM_trainset_idxs[t-1, :] = device_data_idxs[config['N_RAM_BUFFER']:]
+        # Evaluate top-1 accuracy over the complete test set, containing test examples from all classes.
+        acc_global[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1, :])
 
-            test_set_union = []
-            for i in range(t):
-                # Evaluate top-1 accuracy on the test set from each stage using the current subset of examples in EEPROM
-                acc_matrix[t - 1, i] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1, :], test_subset_idxs=test_sets[i])
-                test_set_union += test_sets[i]
+    # Create results directory if it doesn't exist
+    if not os.path.exists(config['results_dir_path']):
+        os.mkdir(config['results_dir_path'])
 
-            # Evaluate top-1 accuracy over the union of all test sets from the classes available up to this stage
-            acc_test_set_union[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1, :], test_subset_idxs=test_set_union)
+    results_dict = {'acc_matrix': acc_matrix,
+                    'acc_test_set_union': acc_test_set_union,
+                    'acc_global': acc_global,
+                    'EEPROM_trainset_idxs': EEPROM_trainset_idxs}
 
-            # Evaluate top-1 accuracy over the complete test set, containing test examples from all classes.
-            acc_global[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1, :])
+    with open(os.path.join(config['results_dir_path'], filename_prefix + 'results_dict.pkl'), 'wb') as f:
+        pickle.dump(results_dict, f)
 
-        # Create results directory if it doesn't exist
-        if not os.path.exists(config['results_dir_path']):
-            os.mkdir(config['results_dir_path'])
+    # Write xml logs to file
+    write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
 
-        results_dict = {'acc_matrix': acc_matrix,
-                        'acc_test_set_union': acc_test_set_union,
-                        'acc_global': acc_global,
-                        'EEPROM_trainset_idxs': EEPROM_trainset_idxs}
+    # Kill the spawned process emulating the device
+    if config['host']:
+        device_emulation.stdin.close()
+        device_emulation.stdout.close()
+        device_emulation.stderr.close()
+        device_emulation.terminate()
+        device_emulation.wait()
 
-        with open(os.path.join(config['results_dir_path'], filename_prefix + 'results_dict.pkl'), 'wb') as f:
-            pickle.dump(results_dict, f)
-
-        # Write xml logs to file
-        write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
-
-        # Kill the spawned process emulating the device
-        if config['host']:
-            device_emulation.terminate()
-
-        print('Done!\n')
+    print('Done!\n')

@@ -80,16 +80,19 @@ def predicted_labels(config):
     return np.zeros(config['N_TOTAL'], dtype=np.uint8)
 
 @pytest.fixture(scope='session', autouse=True)
-def host_process(config):
+def host_process(config, pytestconfig):
     if config['host']:
-        device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])])
-    yield
-    if config['host']:
-        device_emulation.terminate()
-        device_emulation.wait()
+        device_emulation = subprocess.Popen([os.path.join('./', config['build_dir_path'], config['binary_name'])],
+                                            stdin=subprocess.PIPE,
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE,
+                                            text=False)
+        pytestconfig.host_process = device_emulation
+        return device_emulation
+    return None
 
 @pytest.fixture(scope='session')
-def util(config, request):
+def util(config, host_process, request):
     log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
     req_log_txt_file_path = os.path.join(log_txt_dir_path, 'test_requests_log.txt')
     resp_log_txt_file_path = os.path.join(log_txt_dir_path, 'test_responses_log.txt')
@@ -99,17 +102,21 @@ def util(config, request):
     req_log_xml_root = ET.Element('requests')
     resp_log_xml_root = ET.Element('response_log')
 
-    ser = serial.Serial(config['port'], config['baudrate'], timeout=None)
-    # Wait for the initialisation stage on the board to be completed
-    if config['host'] == False:
-        board_init(ser)
-
-    util = {'ser': ser,
-            'req_logger': req_logger,
+    util = {'req_logger': req_logger,
             'resp_logger': resp_logger,
             'req_log_xml_root': req_log_xml_root,
             'resp_log_xml_root': resp_log_xml_root,
             'debug': config['debug']}
+
+    if config['host']:
+        util['writer'] = host_process.stdin
+        util['reader'] = host_process.stdout
+    else:
+        # Start serial connection
+        ser = serial.Serial(config['port'], config['baudrate'], timeout=None)
+        board_init(ser)
+        util['writer'] = ser
+        util['reader'] = ser
 
     request.config.util = util
     return util
@@ -148,3 +155,13 @@ def pytest_sessionfinish(session, exitstatus):
 
     write_xml_files(req_log_xml_file_path, resp_log_xml_file_path,
                     util['req_log_xml_root'], util['resp_log_xml_root'])
+
+
+    device_emulation = getattr(session.config, 'host_process', None)
+    if config['host'] and device_emulation is not None:
+        device_emulation.stdin.close()
+        device_emulation.stdout.close()
+        device_emulation.stderr.close()
+        device_emulation.terminate()
+        device_emulation.wait()
+        print('\nDevice emulation process terminated.')
