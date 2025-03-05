@@ -28,6 +28,10 @@ void update_labels_buffer(struct FunctionArguments *fun_args) {
     }
 }
 
+void copy_example_from_ram_to_eeprom(int ram_example_num, int eeprom_example_num, struct FunctionArguments *fun_args) {
+    memcpy(fun_args->eeprom_buffer_host[eeprom_example_num], fun_args->ram_buffer[ram_example_num], fun_args->bytes_per_example * sizeof(uint8_t));
+}
+
 void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args) {
     // Sort subset_idxs in ascending order
     qsort(subset_idxs, subset_size, sizeof(uint16_t), compare_subset_indices);
@@ -49,7 +53,7 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
 
     int i = 0;
     int j = first_eeprom_idx;
-    for (uint16_t idx = fun_args->ram_buffer_size; idx < fun_args->num_examples_total; idx++) {
+    for (uint16_t idx = fun_args->ram_buffer_size; idx < fun_args->max_num_examples; idx++) {
         if (idx == subset_idxs[j]) {
             j++;
         } else {

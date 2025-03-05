@@ -393,7 +393,7 @@ void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_
     for (int i = 0; i < fun_args->num_examples_total; i++) {
         // Load temporary buffer with the distances between the i-th examples and all the examples in the subset
         for (int j = 0; j < fun_args->eeprom_buffer_size; j++) {
-            temp_dist_buf[j] = get_symmetric_2D_array_value(fun_args->dist_matrix, fun_args->num_examples_total, i, subset_idxs[j]);
+            temp_dist_buf[j] = get_symmetric_2D_array_value(fun_args->dist_matrix, fun_args->max_num_examples, i, subset_idxs[j]);
         }
 
         // Initialise indices buffer
@@ -499,14 +499,15 @@ void single_point_crossover(uint16_t* par_1, uint16_t* par_2, uint16_t* offsprin
 void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, struct FunctionArguments *fun_args) {    
     int idx = 0;
     uint32_t num_of_idxs_to_be_mutated = floor(mutation_rate * fun_args->eeprom_buffer_size);
+    uint32_t num_of_available_idxs = fun_args->num_examples_total - fun_args->eeprom_buffer_size;
 
-    if (num_of_idxs_to_be_mutated > fun_args->ram_buffer_size) {
+    if (num_of_idxs_to_be_mutated > num_of_available_idxs) {
         xprintf("mutation error: num_of_idxs_to_be_mutated is greater than available indices");
         exit(1);
     }
 
     uint8_t* in_subset = calloc(fun_args->num_examples_total, sizeof(uint8_t));
-    uint16_t* idxs_not_in_subset = calloc(fun_args->ram_buffer_size, sizeof(uint16_t));
+    uint16_t* idxs_not_in_subset = calloc(num_of_available_idxs, sizeof(uint16_t));
     uint8_t* idxs_mutated = calloc(fun_args->eeprom_buffer_size, sizeof(uint8_t));
 
     if (in_subset == NULL || idxs_not_in_subset == NULL || idxs_mutated == NULL) {
@@ -529,7 +530,7 @@ void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_ra
         }
     }
     
-    shuffle(idxs_not_in_subset, fun_args->ram_buffer_size);
+    shuffle(idxs_not_in_subset, num_of_available_idxs);
     
     uint8_t label = 0;
     bool mutation_complete = false;

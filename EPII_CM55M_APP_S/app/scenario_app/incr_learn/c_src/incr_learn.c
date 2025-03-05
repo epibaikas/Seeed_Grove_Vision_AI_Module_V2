@@ -144,6 +144,7 @@ int app_main(void) {
 	fun_args.eeprom_sector_buffer = eeprom_sector_buffer;
 
 	fun_args.random_seed = 1;
+	fun_args.exit_flag = false;
 
 	#ifdef GROVE_VISION_WE2
 		uint8_t id_info = 2;
@@ -233,6 +234,11 @@ int app_main(void) {
 		}
 
 		xprintf("ack_end %d\r\n", seq_num);
+
+		if (fun_args.exit_flag == true) {
+			xprintf("incr_learn terminated\r\n");
+			break;
+		}
 	};
 
 	return 0;

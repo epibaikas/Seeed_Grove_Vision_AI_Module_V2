@@ -108,6 +108,10 @@ for i in range(config['N_TOTAL']):
         seq_num += 1
         assert np.array_equal(img_data[i], data_read_buffer)
 
+# Update num_examples_total
+send_command(set_counters, seq_num=seq_num, param_list=[config['N_TOTAL'], config['N_EEPROM_BUFFER']], util=util)
+seq_num += 1
+
 send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
 seq_num += 1
 

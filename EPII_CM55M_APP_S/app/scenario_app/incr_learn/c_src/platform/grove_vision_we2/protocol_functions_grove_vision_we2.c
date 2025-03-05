@@ -81,14 +81,14 @@ void compute_dist_matrix(struct FunctionArguments *fun_args) {
     uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
     int flash_sector_idx = 0;
 
-    uint32_t *self_dot_prod = calloc(fun_args->num_examples_total, sizeof(uint32_t));
+    uint32_t *self_dot_prod = calloc(fun_args->max_num_examples, sizeof(uint32_t));
     if (self_dot_prod == NULL) {
 		xprintf("mem_error: memory allocation for self_dot_prod buffer failed\r\n");
 		exit(1);
 	}
 
     // Compute self-dot products
-    for (int i = 0; i < fun_args->num_examples_total; i++) {
+    for (int i = 0; i < fun_args->max_num_examples; i++) {
         if (i < fun_args->ram_buffer_size)
             self_dot_prod[i] = dot_prod_uint8_vect(fun_args->ram_buffer[i], fun_args->ram_buffer[i], fun_args->data_bytes_per_example);
         else {
@@ -104,8 +104,8 @@ void compute_dist_matrix(struct FunctionArguments *fun_args) {
 
     // Compute distances
     uint32_t dist = 0;
-    for (int i = 0; i < fun_args->num_examples_total; i++) {
-        for (int j = i + 1; j < fun_args->num_examples_total; j++) {
+    for (int i = 0; i < fun_args->max_num_examples; i++) {
+        for (int j = i + 1; j < fun_args->max_num_examples; j++) {
             dist = self_dot_prod[i] + self_dot_prod[j];            
             if (i < fun_args->ram_buffer_size && j < fun_args->ram_buffer_size) {
                 dist -= 2 * dot_prod_uint8_vect(fun_args->ram_buffer[i], fun_args->ram_buffer[j], fun_args->data_bytes_per_example);
@@ -144,15 +144,15 @@ void compute_dist_matrix(struct FunctionArguments *fun_args) {
             }
 
             // xprintf("i = %d, j = %d, %010u ", i, j, dist >> 12);
-            set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->num_examples_total, i, j, dist >> 12);
-            // xprintf("%010u \r\n", get_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->num_examples_total, i, j));
+            set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->max_num_examples, i, j, dist >> 12);
+            // xprintf("%010u \r\n", get_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->max_num_examples, i, j));
         }
         // xprintf("\r\n");
     }
 
     // Set every cell on the diagonal equal to 0xFFFF
-    for (int i = 0; i < fun_args->num_examples_total; i++) {
-        set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->num_examples_total, i, i, 0xFFFF);
+    for (int i = 0; i < fun_args->max_num_examples; i++) {
+        set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->max_num_examples, i, i, 0xFFFF);
     }
 
     free(self_dot_prod);

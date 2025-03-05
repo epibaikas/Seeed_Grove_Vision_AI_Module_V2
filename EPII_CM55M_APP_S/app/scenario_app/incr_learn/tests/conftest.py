@@ -1,6 +1,7 @@
 import pytest
 import serial
 import os
+import math
 import subprocess
 import numpy as np
 from xml.etree import ElementTree as ET
@@ -39,14 +40,23 @@ def dataset(config):
     return dataset
 
 @pytest.fixture(scope='session')
-def img_data(config, dataset):
-    classes = []
-    example_idxs = get_random_balanced_subset_indices(dataset['train_set'], classes, subset_size=config['N_TOTAL'])
+def device_data(config, dataset):
+    device_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_example']), dtype=np.uint8)
 
-    img_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_example']), dtype=np.uint8)
-    img_data[:, 0:config['data_bytes_per_example']] = dataset['X_train'][example_idxs, :].numpy().astype(np.uint8)
-    img_data[:, config['data_bytes_per_example']] = dataset['y_train'][example_idxs].numpy().astype(np.uint8)
-    return img_data
+    # RAM data
+    example_idxs = get_random_balanced_subset_indices(dataset['train_set'], classes=[0], subset_size=config['N_RAM_BUFFER'])
+    device_data[0:config['N_RAM_BUFFER'], 0:config['data_bytes_per_example']] = dataset['X_train'][example_idxs, :].numpy().astype(np.uint8)
+    device_data[0:config['N_RAM_BUFFER'], config['data_bytes_per_example']] = dataset['y_train'][example_idxs].numpy().astype(np.uint8)
+
+    # EEPROM data
+    num_batches = math.floor(config['N_EEPROM_BUFFER'] / config['N_RAM_BUFFER'])
+    for batch_num in range(num_batches):
+        example_idxs = get_random_balanced_subset_indices(dataset['train_set'], classes=[batch_num + 1], subset_size=config['N_RAM_BUFFER'])
+
+        device_data[(batch_num + 1) * config['N_RAM_BUFFER'] : (batch_num + 2) * config['N_RAM_BUFFER'], 0:config['data_bytes_per_example']] = dataset['X_train'][example_idxs, :].numpy().astype(np.uint8)
+        device_data[(batch_num + 1) * config['N_RAM_BUFFER'] : (batch_num + 2) * config['N_RAM_BUFFER'], config['data_bytes_per_example']] = dataset['y_train'][example_idxs].numpy().astype(np.uint8)
+
+    return device_data
 
 @pytest.fixture
 def data_read_buffer(config):
@@ -62,9 +72,9 @@ def dist_array(dist_array_size):
     return np.zeros(dist_array_size, dtype=np.uint16)
 
 @pytest.fixture
-def expected_classifier(config, img_data):
-    classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_example']], img_data[:, config['data_bytes_per_example']])
-    classifier.train(img_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
+def expected_classifier(config, device_data):
+    classifier = kNearestNeighbors(device_data[:, 0:config['data_bytes_per_example']], device_data[:, config['data_bytes_per_example']])
+    classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
     return classifier
 
 @pytest.fixture
@@ -75,9 +85,6 @@ def labels_buffer(config):
 def subset_idxs(config):
     return np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
 
-@pytest.fixture
-def predicted_labels(config):
-    return np.zeros(config['N_TOTAL'], dtype=np.uint8)
 
 @pytest.fixture(scope='session', autouse=True)
 def host_process(config, pytestconfig):

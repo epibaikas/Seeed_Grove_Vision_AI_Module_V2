@@ -66,21 +66,9 @@ class kNearestNeighbors(object):
             # Keep only the indices of the closest k examples
             kNN_labels = self.y_train[self.sorting_idxs[:, 0:k]]
         else:
-            # If the number of examples in the subset is less than 1000, isolate the columns from the distance matrix
-            # corresponding to the training examples in the subset and sort. This approach is faster than searching
-            # sorting_idxs for examples in subset_idxs.
-            if len(subset_idxs) < 1000:
-                sorting_subset_idxs = np.argsort(self.dists[:, subset_idxs], axis=1, kind='stable')
-                y_train_subset = self.y_train[subset_idxs]
-                kNN_labels = y_train_subset[sorting_subset_idxs[:, 0:k]]
-            else:
-                # For subset sizes > 1000, find the first k examples from sorting_idxs that belong to subset_idxs.
-                # Turn the subset_idxs list to a set for faster search.
-                subset_idxs = set(subset_idxs)
-                sorting_subset_idxs = [self.sorting_idxs_in_subset(row, subset_idxs, k) for row in self.sorting_idxs]
-
-                # Retrieve the labels of the closest k examples
-                kNN_labels = self.y_train[sorting_subset_idxs]
+            sorting_subset_idxs = np.argsort(self.dists[:, subset_idxs], axis=1, kind='stable')
+            y_train_subset = self.y_train[subset_idxs]
+            kNN_labels = y_train_subset[sorting_subset_idxs[:, 0:k]]
 
         # Find the most common label (in case of a tie, select the smallest label)
         kNN_label_counts = [np.bincount(row) for row in kNN_labels]

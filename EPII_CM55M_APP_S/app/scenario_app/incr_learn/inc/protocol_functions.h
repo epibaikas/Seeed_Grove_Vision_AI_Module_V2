@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 #ifndef PROTOCOL_FUNCTIONS_H
 #define PROTOCOL_FUNCTIONS_H
 
@@ -6,11 +8,14 @@ struct FunctionArguments {
   char *param;
   uint32_t ram_buffer_size;
   uint32_t eeprom_buffer_size;
+  uint32_t max_num_examples;
   uint32_t num_examples_total;
   uint32_t bytes_per_example;
   uint32_t data_bytes_per_example;
   int examples_per_eeprom_sector;
   uint32_t num_of_classes;
+  uint32_t num_examples_in_eeprom;
+  bool exit_flag;
 
   uint8_t **ram_buffer;
   uint8_t **eeprom_buffer_host;
@@ -34,6 +39,8 @@ void write_ram_buffer(struct FunctionArguments *fun_args);
 void read_ram_buffer(struct FunctionArguments *fun_args);
 void read_labels_buffer(struct FunctionArguments *fun_args);
 
+void move_new_batch_to_eeprom(struct FunctionArguments *fun_args);
+
 void read_dist_matrix(struct FunctionArguments *fun_args);
 void rand_subset_selection(struct FunctionArguments *fun_args);
 void rand_greedy_subset_selection(struct FunctionArguments *fun_args);
@@ -41,6 +48,9 @@ void evo_subset_selection(struct FunctionArguments *fun_args);
 
 void set_data_buffer_parameters(struct FunctionArguments *fun_args);
 void set_random_seed(struct FunctionArguments *fun_args);
+void set_num_examples_total(struct FunctionArguments *fun_args);
+
+void stop(struct FunctionArguments *fun_args);
 
 function_pointer lookup_function(char *command_name);
 #endif

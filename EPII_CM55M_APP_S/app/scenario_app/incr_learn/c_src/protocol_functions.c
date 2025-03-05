@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <math.h>
 #include "xprintf.h"
@@ -53,7 +54,23 @@ void read_labels_buffer(struct FunctionArguments *fun_args) {
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
     update_labels_buffer(fun_args);
-    read_buffer(&(fun_args->labels[0]), fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
+    read_buffer(&(fun_args->labels[0]), fun_args->max_num_examples, sizeof(uint8_t), num_per_line);
+}
+
+void move_new_batch_to_eeprom(struct FunctionArguments *fun_args) {
+    xprintf("ack_begin %d\r\n", fun_args->seq_num);
+
+    // Check if there is enough space in eeprom for the new batch of examples
+    if (fun_args->num_examples_in_eeprom + fun_args->ram_buffer_size <= fun_args->eeprom_buffer_size) {
+        for (int i = 0; i < fun_args->ram_buffer_size; i++) {
+            copy_example_from_ram_to_eeprom(i, fun_args->num_examples_in_eeprom + i, fun_args);
+        }
+        fun_args->num_examples_in_eeprom += fun_args->ram_buffer_size;
+        xprintf("new batch moved to eeprom\r\n");
+    } else {
+        fun_args->num_examples_total = fun_args->ram_buffer_size + fun_args->num_examples_in_eeprom;
+        xprintf("not enough space in eeprom for full batch, num_examples_total = %u\r\n", fun_args->num_examples_total);
+    }
 }
 
 void read_dist_matrix(struct FunctionArguments *fun_args) {
@@ -68,7 +85,7 @@ void read_dist_matrix(struct FunctionArguments *fun_args) {
 
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
-    uint32_t N = fun_args->num_examples_total;
+    uint32_t N = fun_args->max_num_examples;
     uint32_t size = (N * (N + 1)) / 2;
 
     read_buffer(fun_args->dist_matrix, size, sizeof(uint16_t), num_per_line);
@@ -115,6 +132,8 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
 
     // Move subset data examples located in RAM to EEPROM
     move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
+    
+    fun_args->num_examples_in_eeprom = fun_args->eeprom_buffer_size;
 
     free(subset_idxs);
     free(predicted_labels);
@@ -130,7 +149,7 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     char max_avg_class_acc_str[10];
     char avg_class_acc_str[10];
 
-    float mutation_rate = 0.2;
+    float mutation_rate = 0.1;
 
     sscanf_ret_value = sscanf(fun_args->param, "%d %d", &num_iter, &num_per_line);
     if (sscanf_ret_value <= 0) {
@@ -198,6 +217,8 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
 
     // Move subset data examples located in RAM to EEPROM
     move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
+
+    fun_args->num_examples_in_eeprom = fun_args->eeprom_buffer_size;
 
     free(subset_idxs);
     free(candidate_subset_idxs);
@@ -339,6 +360,7 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     // Move subset data examples located in RAM to EEPROM
     move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
 
+    fun_args->num_examples_in_eeprom = fun_args->eeprom_buffer_size;
 
     free_2D_array(population, population_size);
     free_2D_array(parents, num_parents);
@@ -365,11 +387,13 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
 
     fun_args->ram_buffer_size = ram_buffer_size;
     fun_args->eeprom_buffer_size = eeprom_buffer_size;
-    fun_args->num_examples_total = ram_buffer_size + eeprom_buffer_size;
+    fun_args->max_num_examples = ram_buffer_size + eeprom_buffer_size;
     fun_args->bytes_per_example = bytes_per_example;
     fun_args->data_bytes_per_example = bytes_per_example - 1;
     fun_args->examples_per_eeprom_sector = EEPROM_SECTOR_SIZE / bytes_per_example;
     fun_args->num_of_classes = num_of_classes;
+    fun_args->num_examples_in_eeprom = 0;
+    fun_args->num_examples_total = 0;
 
     // Allocate memory for RAM buffer
 	uint8_t **ram_buffer = (uint8_t **)calloc(fun_args->ram_buffer_size, sizeof(uint8_t *));
@@ -406,10 +430,10 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
     #endif
 
 	// Allocate memory for distance matrix
-	uint16_t* dist_matrix = allocate_symmetric_2D_array(fun_args->num_examples_total);
+	uint16_t* dist_matrix = allocate_symmetric_2D_array(fun_args->max_num_examples);
 
-	// Create eeprom buffers;
-	uint8_t* labels = (uint8_t *)calloc(fun_args->num_examples_total, sizeof(uint8_t));
+	// Create labels buffer
+	uint8_t* labels = (uint8_t *)calloc(fun_args->max_num_examples, sizeof(uint8_t));
     
     if (labels == NULL) {
 		xprintf("mem_error: memory allocation for labels buffer failed\r\n");
@@ -422,11 +446,13 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
 
     xprintf("ram_buffer_size: %u\r\n", fun_args->ram_buffer_size);
     xprintf("eeprom_buffer_size: %u\r\n", fun_args->eeprom_buffer_size);
-    xprintf("num_examples_total: %u\r\n", fun_args->num_examples_total);
+    xprintf("max_num_examples: %u\r\n", fun_args->max_num_examples);
     xprintf("bytes_per_example: %u\r\n", fun_args->bytes_per_example);
     xprintf("data_bytes_per_example: %u\r\n", fun_args->data_bytes_per_example);
     xprintf("examples_per_eeprom_sector: %u\r\n", fun_args->examples_per_eeprom_sector);
     xprintf("num_of_classes: %u\r\n", fun_args->num_of_classes);
+    xprintf("num_examples_in_eeprom: %u\r\n", fun_args->num_examples_in_eeprom);
+    xprintf("num_examples_total: %u\r\n", fun_args->num_examples_total);
 
 	xprintf("Addr of dist_matrix: 0x%08x\r\n", fun_args->dist_matrix);
 	xprintf("Addr of eeprom_buffer: 0x%08x\r\n", fun_args->eeprom_buffer);
@@ -454,6 +480,31 @@ void set_random_seed(struct FunctionArguments *fun_args) {
     xprintf("random seed set to: %u\r\n", fun_args->random_seed);
 }
 
+void set_counters(struct FunctionArguments *fun_args) {
+    uint32_t num_examples_total = 0;
+    uint32_t num_examples_in_eeprom = 0;
+    int sscanf_ret_value = 0;
+
+    sscanf_ret_value = sscanf(fun_args->param, "%u %u", &num_examples_total, &num_examples_in_eeprom);
+    if (sscanf_ret_value <= 0) {
+        xprintf("ack_error: set_counters() parameters not parsed correctly\r\n");
+        exit(1);
+    }
+    
+    xprintf("ack_begin %d\r\n", fun_args->seq_num);
+    fun_args->num_examples_total = num_examples_total;
+    fun_args->num_examples_in_eeprom = num_examples_in_eeprom;
+
+    xprintf("num_examples_total set to: %u\r\n", fun_args->num_examples_total);
+    xprintf("num_examples_in_eeprom set to: %u\r\n", fun_args->num_examples_in_eeprom);
+}
+
+void stop(struct FunctionArguments *fun_args) {
+    xprintf("ack_begin %d\r\n", fun_args->seq_num);
+    fun_args->exit_flag = true;
+    xprintf("setting exit_flag to true\r\n");  
+}
+
 function_pointer lookup_function(char *command_name) {
     if (strncmp(command_name, "write_ram_buffer", 17) == 0) {
         return &write_ram_buffer;
@@ -465,6 +516,8 @@ function_pointer lookup_function(char *command_name) {
         return &read_eeprom;
     } else if (strncmp(command_name, "read_labels_buffer", 19) == 0) {
         return &read_labels_buffer;
+    } else if (strncmp(command_name, "move_new_batch_to_eeprom", 25) == 0) {
+        return &move_new_batch_to_eeprom;
     } else if (strncmp(command_name, "compute_dist_matrix", 20) == 0) {
         return &compute_dist_matrix;
     } else if (strncmp(command_name, "read_dist_matrix", 17) == 0) {
@@ -477,8 +530,12 @@ function_pointer lookup_function(char *command_name) {
         return &evo_subset_selection;
     } else if (strncmp(command_name, "set_random_seed", 16) == 0) {
         return &set_random_seed;
+    } else if (strncmp(command_name, "set_counters", 23) == 0) {
+        return &set_counters;
     } else if (strncmp(command_name, "set_data_buffer_parameters", 27) == 0) {
         return &set_data_buffer_parameters;
+    } else if (strncmp(command_name, "stop", 4) == 0) {
+        return &stop; 
     } else {
         xprintf("ack_error: command_name not recognised\r\n");
         xprintf("command_name %s\r\n", command_name);

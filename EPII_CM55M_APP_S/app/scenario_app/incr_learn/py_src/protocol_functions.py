@@ -136,6 +136,15 @@ def read_labels_buffer(param_list, labels_array, util):
     return 0
 
 
+def move_new_batch_to_eeprom(param_list, util):
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    not_enough_space = False if resp_line == 'new batch moved to eeprom' else True
+    return not_enough_space
+
 def compute_dist_matrix(param_list, util):
     resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
@@ -332,7 +341,7 @@ def set_data_buffer_parameters(param_list, util):
     if len(param_list) != 4:
         raise AssertionError('Incorrect param_list length')
 
-    for i in range(13):
+    for i in range(15):
         resp_line = util['reader'].readline().decode()
         debug_print(resp_line, end='', debug=util['debug'])
         util['resp_logger'].info(resp_line.rstrip())
@@ -354,3 +363,36 @@ def set_random_seed(param_list, util):
         raise AssertionError('resp_line not properly received')
 
     return 0
+
+def set_counters(param_list, util):
+    if len(param_list) != 2:
+        raise AssertionError('Incorrect param_list length')
+
+    num_examples_total = param_list[0]
+    num_examples_in_eeprom = param_list[1]
+
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != f'num_examples_total set to: {num_examples_total}':
+        raise AssertionError('resp_line not properly received')
+
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    if resp_line != f'num_examples_in_eeprom set to: {num_examples_in_eeprom}':
+        raise AssertionError('resp_line not properly received')
+
+    return 0
+
+def stop(param_list, util):
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    return 0
+

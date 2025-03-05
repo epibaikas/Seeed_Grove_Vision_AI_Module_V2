@@ -3,8 +3,9 @@ import numpy as np
 
 from dataloaders.cifar100 import CIFAR100
 
-def get_base_dataloader(config, dataloader_generator):
-    class_index = np.arange(config['base_class'])
+def get_base_dataloader(config, dataloader_generator, class_index=None):
+    if class_index is None:
+        class_index = np.arange(config['base_class'])
 
     if config['dataset'] == 'cifar100':
         trainset = CIFAR100(root=config['datasets_dir_path'], train=True, download=True,

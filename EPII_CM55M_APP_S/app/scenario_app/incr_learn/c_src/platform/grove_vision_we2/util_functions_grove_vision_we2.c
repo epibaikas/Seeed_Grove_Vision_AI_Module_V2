@@ -51,6 +51,27 @@ void update_labels_buffer(struct FunctionArguments *fun_args) {
     }
 }
 
+void copy_example_from_ram_to_eeprom(int ram_example_num, int eeprom_example_num, struct FunctionArguments *fun_args) {
+    int flash_sector_num = 0;
+    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
+    int flash_sector_idx = 0;
+
+    // Determine flash_sector_num based on eeprom_example_num
+    get_example_flash_addr(eeprom_example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
+
+    // Read contents from flash sector to eeprom_sector_buffer 
+    hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE);
+
+    // Erase flash sector
+    hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, flash_sector_start_addr, FLASH_SECTOR);
+
+    // Copy the contents of ram_buffer[i] to eeprom_sector_buffer
+    memcpy(&(fun_args->eeprom_sector_buffer[flash_sector_idx]),  fun_args->ram_buffer[ram_example_num], fun_args->bytes_per_example);
+
+    // Write data in eeprom_sector_buffer to flash
+    hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE, 0);
+}
+
 void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct FunctionArguments *fun_args) {
     // Sort subset_idxs in ascending order
     qsort(subset_idxs, subset_size, sizeof(uint16_t), compare_subset_indices);
@@ -72,7 +93,7 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
 
     int i = 0;
     int j = first_eeprom_idx;
-    for (uint16_t idx = fun_args->ram_buffer_size; idx < fun_args->num_examples_total; idx++) {
+    for (uint16_t idx = fun_args->ram_buffer_size; idx < fun_args->max_num_examples; idx++) {
         if (idx == subset_idxs[j]) {
             j++;
         } else {
@@ -84,28 +105,10 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
     }
 
     int example_num = 0;
-    int flash_sector_num = 0;
-    uint32_t flash_sector_start_addr = EEPROM_BASE_ADDRESS;
-    int flash_sector_idx = 0;
-
     // Replace EEPROM examples that are not in the subset with examples from RAM
     for (int i = 0; i < first_eeprom_idx; i++) {
-        example_num = eeprom_indices_not_in_subset[i] - fun_args->ram_buffer_size; // Subtract fun_args->ram_buffer_size to change index range to [0, NUM_OF_IMGS_IN_EEPROM - 1]
-
-        // Determine flash_sector_num based on example_num
-        get_example_flash_addr(example_num, &flash_sector_num, &flash_sector_start_addr, &flash_sector_idx, fun_args);
-
-        // Read contents from flash sector to eeprom_sector_buffer 
-        hx_lib_spi_eeprom_4read(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE);
-
-        // Erase flash sector
-        hx_lib_spi_eeprom_erase_sector(USE_DW_SPI_MST_Q, flash_sector_start_addr, FLASH_SECTOR);
-
-        // Copy the contents of ram_buffer[subset_idxs[i]] to eeprom_sector_buffer
-        memcpy(&(fun_args->eeprom_sector_buffer[flash_sector_idx]),  fun_args->ram_buffer[subset_idxs[i]], fun_args->bytes_per_example);
-
-        // Write data in eeprom_sector_buffer to flash
-        hx_lib_spi_eeprom_write(USE_DW_SPI_MST_Q, flash_sector_start_addr, &(fun_args->eeprom_sector_buffer[0]), EEPROM_SECTOR_SIZE, 0);
+        example_num = eeprom_indices_not_in_subset[i] - fun_args->ram_buffer_size; // Subtract fun_args->ram_buffer_size to change index range to [0, fun_args->eeprom_buffer_size - 1]
+        copy_example_from_ram_to_eeprom(subset_idxs[i], example_num, fun_args);
     }
 
     free(eeprom_indices_not_in_subset);
