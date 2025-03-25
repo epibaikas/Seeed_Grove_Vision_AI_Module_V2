@@ -176,35 +176,67 @@ int compare_subset_indices(const void *a, const void *b) {
     return (*(uint16_t*)a - *(uint16_t*)b);
 }
 
-// Comparator function for stable argsort
-int compare_indices(void *arr, const void *a, const void *b) {
-    uint16_t *array = (uint16_t *)arr;
-    uint16_t idx1 = *(const uint16_t *)a;
-    uint16_t idx2 = *(const uint16_t *)b;
-    if (array[idx1] < array[idx2]) return -1;
-    if (array[idx1] > array[idx2]) return 1;
-    return idx1 - idx2;
-}
+#ifdef _GNU_SOURCE
+    // Comparator function for stable argsort
+    int compare_indices(const void *a, const void *b, void *arr) {
+        uint16_t *array = (uint16_t *)arr;
+        uint16_t idx1 = *(const uint16_t *)a;
+        uint16_t idx2 = *(const uint16_t *)b;
+        if (array[idx1] < array[idx2]) return -1;
+        if (array[idx1] > array[idx2]) return 1;
+        return idx1 - idx2;
+    }
 
-// Comparator function for stable argsort - uint8_t - ascending
-int compare_indices_uint8(void *arr, const void *a, const void *b) {
-    uint8_t *array = (uint8_t *)arr;
-    uint16_t idx1 = *(const uint16_t *)a;
-    uint16_t idx2 = *(const uint16_t *)b;
-    if (array[idx1] < array[idx2]) return -1;
-    if (array[idx1] > array[idx2]) return 1;
-    return idx1 - idx2;
-}
+    // Comparator function for stable argsort - uint8_t - ascending
+    int compare_indices_uint8(const void *a, const void *b, void *arr) {
+        uint8_t *array = (uint8_t *)arr;
+        uint16_t idx1 = *(const uint16_t *)a;
+        uint16_t idx2 = *(const uint16_t *)b;
+        if (array[idx1] < array[idx2]) return -1;
+        if (array[idx1] > array[idx2]) return 1;
+        return idx1 - idx2;
+    }
 
-// Comparator function for stable argsort - float - descending
-int compare_indices_float_array(void *arr, const void *a, const void *b) {
-    float *array = (float *)arr;
-    uint8_t idx1 = *(const uint8_t *)a;
-    uint8_t idx2 = *(const uint8_t *)b;
-    if (array[idx1] < array[idx2]) return 1;
-    if (array[idx1] > array[idx2]) return -1;
-    return idx1 - idx2;
-}
+    // Comparator function for stable argsort - float - descending
+    int compare_indices_float_array(const void *a, const void *b, void *arr) {
+        float *array = (float *)arr;
+        uint8_t idx1 = *(const uint8_t *)a;
+        uint8_t idx2 = *(const uint8_t *)b;
+        if (array[idx1] < array[idx2]) return 1;
+        if (array[idx1] > array[idx2]) return -1;
+        return idx1 - idx2;
+    }
+#else
+    // Comparator function for stable argsort
+    int compare_indices(void *arr, const void *a, const void *b) {
+        uint16_t *array = (uint16_t *)arr;
+        uint16_t idx1 = *(const uint16_t *)a;
+        uint16_t idx2 = *(const uint16_t *)b;
+        if (array[idx1] < array[idx2]) return -1;
+        if (array[idx1] > array[idx2]) return 1;
+        return idx1 - idx2;
+    }
+
+    // Comparator function for stable argsort - uint8_t - ascending
+    int compare_indices_uint8(void *arr, const void *a, const void *b) {
+        uint8_t *array = (uint8_t *)arr;
+        uint16_t idx1 = *(const uint16_t *)a;
+        uint16_t idx2 = *(const uint16_t *)b;
+        if (array[idx1] < array[idx2]) return -1;
+        if (array[idx1] > array[idx2]) return 1;
+        return idx1 - idx2;
+    }
+
+    // Comparator function for stable argsort - float - descending
+    int compare_indices_float_array(void *arr, const void *a, const void *b) {
+        float *array = (float *)arr;
+        uint8_t idx1 = *(const uint8_t *)a;
+        uint8_t idx2 = *(const uint8_t *)b;
+        if (array[idx1] < array[idx2]) return 1;
+        if (array[idx1] > array[idx2]) return -1;
+        return idx1 - idx2;
+    }
+#endif
 
 uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k, struct FunctionArguments *fun_args) {
     uint8_t *label_counts = (uint8_t *)calloc(fun_args->num_of_classes, sizeof(uint8_t));
@@ -401,7 +433,11 @@ void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_
             indices[i] = i;
         }
         // Get the indices that sort temp_dist_buf in ascending distance order
-        qsort_r(indices, fun_args->eeprom_buffer_size, sizeof(uint16_t), (void *) temp_dist_buf, compare_indices);
+        #ifdef _GNU_SOURCE
+            qsort_r(indices, fun_args->eeprom_buffer_size, sizeof(uint16_t), compare_indices, (void *) temp_dist_buf);
+        #else
+            qsort_r(indices, fun_args->eeprom_buffer_size, sizeof(uint16_t), (void *) temp_dist_buf, compare_indices);
+        #endif
 
         // Convert the indices to the corresponding subset_idxs
         for (int j = 0; j < fun_args->eeprom_buffer_size; j++) {

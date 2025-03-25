@@ -5,6 +5,7 @@ INCDIR += inc/platform/host
 
 CFLAGS = -g -Wall
 CFLAGS += -DHOST_PLATFORM 
+CFLAGS += -D_GNU_SOURCE
 CFLAGS += $(addprefix -I, $(INCDIR))
 
 BUILD_DIR = build
@@ -18,7 +19,7 @@ OBJ = $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRC))
 
 # Build the executable
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) $^ -o $(BUILD_DIR)/$@
+	$(CC) $(CFLAGS) $^ -o $(BUILD_DIR)/$@ -lm
 
 # Rule to compile all object files
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)

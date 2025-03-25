@@ -21,9 +21,16 @@ void get_random_subset(uint32_t M, uint32_t N, uint16_t* subset_idxs);
 void get_random_bal_subset(uint8_t *labels, uint16_t* subset_idxs, struct FunctionArguments *fun_args);
 
 int compare_subset_indices(const void *a, const void *b);
+
+#ifdef _GNU_SOURCE
+int compare_indices(const void *a, const void *b, void *arr);
+int compare_indices_uint8(const void *a, const void *b, void *arr);
+int compare_indices_float_array(const void *a, const void *b, void *arr);
+#else
 int compare_indices(void *arr, const void *a, const void *b);
 int compare_indices_uint8(void *arr, const void *a, const void *b);
 int compare_indices_float_array(void *arr, const void *a, const void *b);
+#endif
 
 uint8_t predict_label(uint16_t *sorting_indices, uint8_t *labels, uint8_t k, struct FunctionArguments *fun_args);
 uint8_t find_max_index(uint8_t *array, size_t size);

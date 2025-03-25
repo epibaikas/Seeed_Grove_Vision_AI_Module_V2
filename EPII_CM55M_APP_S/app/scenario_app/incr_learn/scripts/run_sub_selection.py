@@ -32,17 +32,21 @@ if __name__ == '__main__':
     if dataset_name not in dataset_names:
         raise ValueError(f'Not valid dataset name {dataset_name}')
 
-    MAX_WORKERS = 6
+    if dataset_name == 'EMNIST':
+        MAX_WORKERS = 6
+    else:
+        MAX_WORKERS = 12
 
     py_file_path = 'py_src/sub_selection.py'
 
     scripts_with_args = []
+    start_trial = 1
     num_of_trials = 20
     sub_sel_funcs = [1, 2, 3]
     seq_types = ['low', 'high']
 
     for func in sub_sel_funcs:
-        for trial in range(1, num_of_trials + 1):
+        for trial in range(start_trial, num_of_trials + 1):
             for seq_type in seq_types:
                 scripts_with_args.append((py_file_path,  [dataset_name, str(func), seq_type,
                                                           str(ram_buf_size), str(eeprom_buf_size), str(trial)]))

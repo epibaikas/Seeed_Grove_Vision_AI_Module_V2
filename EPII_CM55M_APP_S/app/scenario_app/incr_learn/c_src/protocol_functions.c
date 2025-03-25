@@ -284,7 +284,11 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     }
 
     // Get the indices that sort fitness scores in descending order
-    qsort_r(max_fitness_idxs, population_size, sizeof(uint8_t), (void *) fitness, compare_indices_float_array);
+    #ifdef _GNU_SOURCE
+        qsort_r(max_fitness_idxs, population_size, sizeof(uint8_t), compare_indices_float_array, (void *) fitness);
+    #else
+        qsort_r(max_fitness_idxs, population_size, sizeof(uint8_t), (void *) fitness, compare_indices_float_array);
+    #endif
 
     best_fitness = fitness[max_fitness_idxs[0]];
     memcpy(subset_idxs, population[max_fitness_idxs[0]], fun_args->eeprom_buffer_size * sizeof(uint16_t));
@@ -300,7 +304,12 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
             // Sort the subset_idxs in a parent chromosome first in ascending order and then in ascending class label order
             // The purpose of the double sorting is to avoid duplicates when combining chromosomes with single-point crossover
             qsort(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), compare_subset_indices);
-            qsort_r(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), fun_args->labels , compare_indices_uint8);
+
+            #ifdef _GNU_SOURCE
+                qsort_r(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), compare_indices_uint8, fun_args->labels);
+            #else
+                qsort_r(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), fun_args->labels , compare_indices_uint8);
+            #endif
         }
 
         // Place the elite solutions directly to the new population
@@ -323,7 +332,11 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
         }
 
         // Get the indices that sort fitness scores in descending order
-        qsort_r(max_fitness_idxs, population_size, sizeof(uint8_t), (void *) fitness, compare_indices_float_array);
+        #ifdef _GNU_SOURCE
+            qsort_r(max_fitness_idxs, population_size, sizeof(uint8_t), compare_indices_float_array, (void *) fitness);
+        #else
+            qsort_r(max_fitness_idxs, population_size, sizeof(uint8_t), (void *) fitness, compare_indices_float_array);
+        #endif
 
         if (fitness[max_fitness_idxs[0]] > best_fitness) {
             best_fitness = fitness[max_fitness_idxs[0]];
