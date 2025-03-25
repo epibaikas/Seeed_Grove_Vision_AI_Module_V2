@@ -100,7 +100,7 @@ def board_init(ser):
         line = ser.readline().decode()  # read a '\n' terminated line and convert it to string
         line = line.strip("\r\n")
         if line == 'Board initialisation complete':
-            print(line, end='')
+            print(line)
             board_init_complete = True
 
 def debug_print(message, end='\n', debug=False):

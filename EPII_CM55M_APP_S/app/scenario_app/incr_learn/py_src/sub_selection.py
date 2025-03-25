@@ -29,6 +29,7 @@ if __name__ == '__main__':
                         help='The size of the EEPROM buffer given in KBs')
     parser.add_argument('trial', type=positive_int,
                         help='The experiment trial number used to adjust random seed for random sampling functions')
+    parser.add_argument('--target_dev', action='store_false', help='Use --device flag when experiment will be run on the actual device')
 
     args = vars(parser.parse_args())
 
@@ -39,6 +40,7 @@ if __name__ == '__main__':
     ram_buf_size = args['ram_buf_size']
     eeprom_buf_size = args['eeprom_buf_size']
     trial = args['trial']
+    target_dev = args['target_dev']
 
     # Check that the class sequence is valid
     if seq_type != 'high' and seq_type != 'low':
@@ -72,6 +74,9 @@ if __name__ == '__main__':
     config['N_RAM_BUFFER'] = math.floor(ram_buf_size * 1024 / (X_train.shape[1] + 1))
     config['N_EEPROM_BUFFER'] = math.floor(eeprom_buf_size * 1024 / (X_train.shape[1] + 1))
     config['N_TOTAL'] = config['N_RAM_BUFFER'] + config['N_EEPROM_BUFFER']
+
+    # Overwrite the config['host'] flag
+    config['host'] = target_dev
 
     # Create kNN classifier for evaluation
     classifier = kNearestNeighbors(X_train, y_train)

@@ -288,15 +288,15 @@ def plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buf
     x = np.arange(len(x_labels))
     width = 0.15 # the width of the bars
 
-    compute_dist_time_list = []
-
-    sub_sel_func_time_list = [[], [], []]
-
-    sub_sel_func_time_mean = np.zeros(len(sub_sel_funcs))
-    sub_sel_func_time_std = np.zeros(len(sub_sel_funcs))
 
     for color_idx, [ram_buffer_size, eeprom_buffer_size] in enumerate(buffer_sizes):
         label = f'({ram_buffer_size}, {eeprom_buffer_size})'
+
+        compute_dist_time_list = []
+
+        sub_sel_func_time_list = [[], [], []]
+        sub_sel_func_time_mean = np.zeros(len(sub_sel_funcs))
+        sub_sel_func_time_std = np.zeros(len(sub_sel_funcs))
 
         for i, func in enumerate(sub_sel_funcs):
             for j in range(num_of_trials):
@@ -331,8 +331,10 @@ def plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buf
         height = [compute_dist_time_mean] + list(sub_sel_func_time_mean)
         yerr = [compute_dist_time_std] + list(sub_sel_func_time_std)
 
+        print(f'{(ram_buffer_size, eeprom_buffer_size)}, mean time = {height}, std = {yerr}')
+
         ax.bar(x + (color_idx * width - (len(buffer_sizes) - 1) * width/2), height, width, label=label, color=color_dict[(ram_buffer_size, eeprom_buffer_size)])
-        # ax.errorbar(x + (color_idx * width - (len(sub_sel_funcs) + 1) * width / 2), y=height, yerr=yerr, fmt='o', color='r')
+        ax.errorbar(x + (color_idx * width - (len(buffer_sizes) - 1) * width / 2), y=height, yerr=yerr, fmt='o', color='r')
 
     ax.set_xticks(x)
     ax.set_xticklabels(x_labels, ha='center')
@@ -379,6 +381,7 @@ if __name__ == '__main__':
     color_list = [mcolors.to_hex(cm.tab10(i / 7)) for i in range(8)]
     color_dict = {buffer_size : color_list[i] for i, buffer_size in enumerate(buffer_sizes)}
 
+    config['host'] = True
     textwidth = 395.8225
     dataset_names = ['MNIST', 'FashionMNIST']
     sub_sel_funcs = ['rand_bal', ['rand_greedy', 100], ['evo', 50]]
@@ -397,7 +400,7 @@ if __name__ == '__main__':
                     (128, 256),
                     (256, 512)]
     num_of_trials = 20
-    plot_timing_measurements(config, dataset_names[0], sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=True)
+    plot_timing_measurements(config, dataset_names[1], sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=True)
 
     dataset_names = ['EMNIST']
     buffer_sizes = [(128, 256),

@@ -20,6 +20,7 @@ if __name__ == '__main__':
                         help='The size of RAM buffer given in KBs')
     parser.add_argument('eeprom_buf_size', type=positive_int,
                         help='The size of the EEPROM buffer given in KBs')
+    parser.add_argument('--target_dev', action='store_false', help='Use --device flag when experiments will be run on the actual device')
 
     args = vars(parser.parse_args())
 
@@ -27,40 +28,63 @@ if __name__ == '__main__':
     dataset_name = args['dataset']
     ram_buf_size = args['ram_buf_size']
     eeprom_buf_size = args['eeprom_buf_size']
+    host = args['target_dev']
+
+    print(f'target_dev={host}')
 
     dataset_names = ['FashionMNIST', 'MNIST', 'EMNIST']
     if dataset_name not in dataset_names:
         raise ValueError(f'Not valid dataset name {dataset_name}')
 
-    if dataset_name == 'EMNIST':
-        MAX_WORKERS = 6
-    else:
-        MAX_WORKERS = 12
-
+    sub_sel_funcs = [1, 2, 3]
     py_file_path = 'py_src/sub_selection.py'
 
-    scripts_with_args = []
-    start_trial = 1
-    num_of_trials = 20
-    sub_sel_funcs = [1, 2, 3]
-    seq_types = ['low', 'high']
+    if host:
+        if dataset_name == 'EMNIST':
+            MAX_WORKERS = 6
+        else:
+            MAX_WORKERS = 12
 
-    for func in sub_sel_funcs:
-        for trial in range(start_trial, num_of_trials + 1):
-            for seq_type in seq_types:
-                scripts_with_args.append((py_file_path,  [dataset_name, str(func), seq_type,
-                                                          str(ram_buf_size), str(eeprom_buf_size), str(trial)]))
+        scripts_with_args = []
+        start_trial = 1
+        num_of_trials = 20
+        seq_types = ['low', 'high']
 
-    # Use ProcessPoolExecutor to limit concurrent execution
-    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_script = {executor.submit(run_trial, script_args): script_args for script_args in scripts_with_args}
+        for func in sub_sel_funcs:
+            for trial in range(start_trial, num_of_trials + 1):
+                for seq_type in seq_types:
+                    scripts_with_args.append((py_file_path,  [dataset_name, str(func), seq_type,
+                                                            str(ram_buf_size), str(eeprom_buf_size), str(trial)]))
 
-        for future in concurrent.futures.as_completed(future_to_script):
-                script = future_to_script[future]
-                print(f'{script[0]} with parameters {script[1]} completed!')
+        # Use ProcessPoolExecutor to limit concurrent execution
+        with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            future_to_script = {executor.submit(run_trial, script_args): script_args for script_args in scripts_with_args}
 
-                # try:
-                #     output = future.result()
-                #     print(f'Output from {script}:\n{output}')
-                # except Exception as e:
-                #     print(f'Error running {script}: {e}')
+            for future in concurrent.futures.as_completed(future_to_script):
+                    script = future_to_script[future]
+                    print(f'{script[0]} with parameters {script[1]} completed!')
+
+                    # try:
+                    #     output = future.result()
+                    #     print(f'Output from {script}:\n{output}')
+                    # except Exception as e:
+                    #     print(f'Error running {script}: {e}')
+    else:
+        start_trial = 1
+        num_of_trials = 1
+        seq_types = ['low', 'high']
+
+        for func in sub_sel_funcs:
+            for trial in range(start_trial, num_of_trials + 1):
+                for seq_type in seq_types:
+                    args = [dataset_name, str(func), seq_type, str(ram_buf_size), 
+                            str(eeprom_buf_size), str(trial), '--target_dev']
+                    
+                    process = subprocess.Popen(["python", py_file_path] + args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, text=True, bufsize=1)
+
+                    # Read and print output in real-time
+                    for line in process.stdout:
+                        print(line, end="")  # Print each line as it comes
+
+                    # Wait for the process to finish
+                    process.wait()
