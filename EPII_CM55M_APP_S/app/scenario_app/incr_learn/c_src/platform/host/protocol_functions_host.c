@@ -48,6 +48,15 @@ void read_eeprom(struct FunctionArguments *fun_args) {
 }
 
 void compute_dist_matrix(struct FunctionArguments *fun_args) {
+    uint32_t bitshift = 0;
+    int sscanf_ret_value = 0;
+
+    sscanf_ret_value = sscanf(fun_args->param, "%u", &bitshift);
+    if (sscanf_ret_value <= 0) {
+        xprintf("ack_error: compute_dist_matrix() parameters not parsed correctly\r\n");
+        exit(1);
+    }
+
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
     int example_num = 0;
@@ -99,8 +108,8 @@ void compute_dist_matrix(struct FunctionArguments *fun_args) {
                 // xprintf("i = %d, j = %d, Cond 4\r\n", i, j);
             }
 
-            // xprintf("i = %d, j = %d, %010u ", i, j, dist >> 12);
-            set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->max_num_examples, i, j, dist >> 12);
+            // xprintf("i = %d, j = %d, %010u ", i, j, dist >> bitshift);
+            set_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->max_num_examples, i, j, dist >> bitshift);
             // xprintf("%010u \r\n", get_symmetric_2D_array_value(&(fun_args->dist_matrix[0]), fun_args->max_num_examples, i, j));
         }
         // xprintf("\r\n");

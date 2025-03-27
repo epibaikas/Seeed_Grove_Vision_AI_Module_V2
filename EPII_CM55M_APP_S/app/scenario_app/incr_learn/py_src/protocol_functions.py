@@ -146,6 +146,11 @@ def move_new_batch_to_eeprom(param_list, util):
     return not_enough_space
 
 def compute_dist_matrix(param_list, util):
+    if len(param_list) != 1:
+        raise AssertionError('Incorrect param_list length')
+
+    bitshift = param_list[0]
+
     resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
     util['resp_logger'].info(resp_line.rstrip())

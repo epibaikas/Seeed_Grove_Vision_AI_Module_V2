@@ -116,7 +116,7 @@ dataset_name = args['dataset']
 
 # Get configuration parameters
 config_dir_path = 'config/'
-config = read_config(config_dir_path)
+config = read_config(config_dir_path, 'config_global.ini')
 
 # Set the device
 device = 'cpu'
@@ -143,7 +143,7 @@ if os.path.isfile(path_1) and os.path.isfile(path_2):
     classifier.sorting_idxs = np.load(path_2)
 else:
     print('Computing distance matrix and sorting indices...')
-    classifier.train(X_test, bitshift=12)
+    classifier.train(X_test, bitshift=config['bitshift'])
     np.save(path_1, classifier.dists)
     np.save(path_2, classifier.sorting_idxs)
 

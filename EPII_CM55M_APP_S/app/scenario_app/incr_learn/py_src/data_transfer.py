@@ -36,7 +36,7 @@ dist_array_size = int(config['N_TOTAL'] * (config['N_TOTAL'] + 1) / 2)
 dist_array = np.zeros(dist_array_size, dtype=np.uint16)
 
 expected_classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_example']], img_data[:, config['data_bytes_per_example']])
-expected_classifier.train(img_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
+expected_classifier.train(img_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=config['bitshift'])
 
 labels_buffer = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
@@ -112,7 +112,7 @@ for i in range(config['N_TOTAL']):
 send_command(set_counters, seq_num=seq_num, param_list=[config['N_TOTAL'], config['N_EEPROM_BUFFER']], util=util)
 seq_num += 1
 
-send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
+send_command(compute_dist_matrix, seq_num=seq_num, param_list=[config['bitshift']], util=util)
 seq_num += 1
 
 send_command(read_dist_matrix, seq_num=seq_num, param_list=[200, config['N_TOTAL']], util=util, data_out=dist_array)

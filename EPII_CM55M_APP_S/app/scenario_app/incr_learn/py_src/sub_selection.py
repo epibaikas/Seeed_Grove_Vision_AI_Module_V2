@@ -92,7 +92,7 @@ if __name__ == '__main__':
         classifier.sorting_idxs = np.load(path_2)
     else:
         print('Computing distance matrix and sorting indices...')
-        classifier.train(X_test, bitshift=12)
+        classifier.train(X_test, bitshift=config['bitshift'])
         np.save(path_1, classifier.dists)
         np.save(path_2, classifier.sorting_idxs)
 
@@ -239,7 +239,7 @@ if __name__ == '__main__':
         if not_enough_space:
             # Compute dist matrix
             print('\tComputing distance matrix...')
-            send_command(compute_dist_matrix, seq_num=seq_num, param_list=[], util=util)
+            send_command(compute_dist_matrix, seq_num=seq_num, param_list=[config['bitshift']], util=util)
             seq_num += 1
 
             if num_examples_in_eeprom + config['N_RAM_BUFFER'] < config['N_TOTAL']:
@@ -256,7 +256,7 @@ if __name__ == '__main__':
 
             # Check that the predicted labels returned by the device match the expected ones
             expected_classifier = kNearestNeighbors(device_data[:, 0:config['data_bytes_per_example']], device_data[:, config['data_bytes_per_example']])
-            expected_classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
+            expected_classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=config['bitshift'])
 
             expected_predicted_labels = expected_classifier.predict(device_data[:, 0:config['data_bytes_per_example']],
                                         subset_idxs, train_classifier=False, k=3)
@@ -306,7 +306,7 @@ if __name__ == '__main__':
 
             # Evaluate top-1 accuracy over the union of all train examples provided to the device up to this stage
             eval_classifier = kNearestNeighbors(X_train[EEPROM_trainset_idxs[t-1]], y_train[EEPROM_trainset_idxs[t-1]])
-            eval_classifier.train(X_train[train_set_union], symmetric=False, bitshift=12)
+            eval_classifier.train(X_train[train_set_union], symmetric=False, bitshift=config['bitshift'])
             acc_train_set_union[t - 1] = ACC(eval_classifier, X_train[train_set_union], y_train[train_set_union], subset_idxs=[])
 
             # Evaluate top-1 accuracy over the complete test set, containing test examples from all classes.

@@ -74,7 +74,7 @@ def dist_array(dist_array_size):
 @pytest.fixture
 def expected_classifier(config, device_data):
     classifier = kNearestNeighbors(device_data[:, 0:config['data_bytes_per_example']], device_data[:, config['data_bytes_per_example']])
-    classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=12)
+    classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=config['bitshift'])
     return classifier
 
 @pytest.fixture

@@ -54,7 +54,7 @@ def test_move_new_batch_to_eeprom(seq_num, config, device_data, util, data_read_
     assert command_return_value is True
 
 def test_compute_distance_matrix(seq_num, config, util, dist_array_size, dist_array, expected_classifier):
-    send_command(compute_dist_matrix, seq_num=seq_num['value'], param_list=[], util=util)
+    send_command(compute_dist_matrix, seq_num=seq_num['value'], param_list=[config['bitshift']], util=util)
     increment_seq_num(seq_num)
 
     send_command(read_dist_matrix, seq_num=seq_num['value'], param_list=[200, config['N_TOTAL']], util=util, data_out=dist_array)
