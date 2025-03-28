@@ -16,6 +16,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Script for running class-incremental learning experiments')
 
     parser.add_argument('dataset', type=str, help='The name of the dataset to be used')
+    parser.add_argument('sub_sel_func', type=str, help='Subset selection function (\'rand\' for random '
+                                                       'selection, \'rand_bal\' for random balanced selection, \'greedy_bal\' for '
+                                                       'greedy balanced, \'evo\' for evolutionary')
     parser.add_argument('ram_buf_size', type=positive_int,
                         help='The size of RAM buffer given in KBs')
     parser.add_argument('eeprom_buf_size', type=positive_int,
@@ -26,17 +29,23 @@ if __name__ == '__main__':
 
     # Get the arguments
     dataset_name = args['dataset']
+    sub_sel_func = args['sub_sel_func']
     ram_buf_size = args['ram_buf_size']
     eeprom_buf_size = args['eeprom_buf_size']
     host = args['target_dev']
 
-    print(f'target_dev={host}')
+    print(f'host={host}')
 
     dataset_names = ['FashionMNIST', 'MNIST', 'EMNIST']
     if dataset_name not in dataset_names:
         raise ValueError(f'Not valid dataset name {dataset_name}')
 
-    sub_sel_funcs = [1, 2, 3]
+    sub_sel_funcs = ['rand', 'rand_bal', 'greedy_bal', 'evo']
+    if sub_sel_func not in sub_sel_funcs:
+        raise ValueError(f'Not valid subset selection function name {sub_sel_func}')
+    
+    func = sub_sel_funcs.index(sub_sel_func)
+
     py_file_path = 'py_src/sub_selection.py'
 
     if host:
@@ -50,11 +59,10 @@ if __name__ == '__main__':
         num_of_trials = 20
         seq_types = ['low', 'high']
 
-        for func in sub_sel_funcs:
-            for trial in range(start_trial, num_of_trials + 1):
-                for seq_type in seq_types:
-                    scripts_with_args.append((py_file_path,  [dataset_name, str(func), seq_type,
-                                                            str(ram_buf_size), str(eeprom_buf_size), str(trial)]))
+        for trial in range(start_trial, num_of_trials + 1):
+            for seq_type in seq_types:
+                scripts_with_args.append((py_file_path,  [dataset_name, str(func), seq_type,
+                                                        str(ram_buf_size), str(eeprom_buf_size), str(trial)]))
 
         # Use ProcessPoolExecutor to limit concurrent execution
         with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -74,17 +82,16 @@ if __name__ == '__main__':
         num_of_trials = 1
         seq_types = ['low', 'high']
 
-        for func in sub_sel_funcs:
-            for trial in range(start_trial, num_of_trials + 1):
-                for seq_type in seq_types:
-                    args = [dataset_name, str(func), seq_type, str(ram_buf_size), 
-                            str(eeprom_buf_size), str(trial), '--target_dev']
-                    
-                    process = subprocess.Popen(["python", py_file_path] + args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, text=True, bufsize=1)
+        for trial in range(start_trial, num_of_trials + 1):
+            for seq_type in seq_types:
+                args = [dataset_name, str(func), seq_type, str(ram_buf_size), 
+                        str(eeprom_buf_size), str(trial), '--target_dev']
+                
+                process = subprocess.Popen(["python", py_file_path] + args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, text=True, bufsize=1)
 
-                    # Read and print output in real-time
-                    for line in process.stdout:
-                        print(line, end="")  # Print each line as it comes
+                # Read and print output in real-time
+                for line in process.stdout:
+                    print(line, end="")  # Print each line as it comes
 
-                    # Wait for the process to finish
-                    process.wait()
+                # Wait for the process to finish
+                process.wait()
