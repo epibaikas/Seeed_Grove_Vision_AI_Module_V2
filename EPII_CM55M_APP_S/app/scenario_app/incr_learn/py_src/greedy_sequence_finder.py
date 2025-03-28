@@ -23,14 +23,14 @@ def get_train_and_test_examples_of_class_pair(class_pair):
     return M, test_example_idxs
 
 
-def find_next_class(Q, available_classes, M, test_example_idxs, acc_list, high=True):
+def find_next_class(Q, available_classes, M, test_example_idxs, acc_list, first_pair=False, high=True):
     if len(available_classes) == 0:
         return Q
     else:
         highest_acc_class = (-1, 0.0)
         lowest_acc_class = (-1, 1.0)
 
-        for class_num in available_classes:
+        for class_num in tqdm(available_classes):
             new_class_idxs = torch.nonzero((train_set.targets == class_num))
             new_class_idxs = torch.squeeze(new_class_idxs).numpy().tolist()
 
@@ -65,7 +65,10 @@ def find_next_class(Q, available_classes, M, test_example_idxs, acc_list, high=T
         new_test_example_idxs = torch.squeeze(new_test_example_idxs).numpy().tolist()
         test_example_idxs += new_test_example_idxs
 
-        return find_next_class(Q, available_classes, M, test_example_idxs, acc_list, high)
+        if first_pair:
+            return Q
+        else:
+            return find_next_class(Q, available_classes, M, test_example_idxs, acc_list, first_pair=False, high=high)
 
 
 def find_first_pair(available_classes):
@@ -163,22 +166,38 @@ else:
         pickle.dump((highest_acc_pair, lowest_acc_pair, fully_separable_pairs), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # Find the highest acc class sequence
-if fully_separable_pairs:
+if len(fully_separable_pairs) > 1:
     print('Testing sequences of fully separable pairs...')
     highest_acc_sum = 0.0
     highest_acc_Q = []
+    highest_acc_list = []
     for class_pair in tqdm(fully_separable_pairs):
         print('Pair:', class_pair)
         M, test_example_idxs = get_train_and_test_examples_of_class_pair(class_pair)
-        highest_acc_list = [1.0]
+        acc_list = [1.0]
 
         remaining_classes = list(set(available_classes) - set(class_pair))
-        Q_high = find_next_class(class_pair, remaining_classes, M, test_example_idxs, highest_acc_list, high=True)
+        Q_high = find_next_class(class_pair, remaining_classes, M, test_example_idxs, acc_list, first_pair=True, high=True)
 
         # Select the sequence whose sum of accuracies is the highest
-        if (sum(highest_acc_list) > highest_acc_sum):
-            highest_acc_sum = sum(highest_acc_list)
+        if (sum(acc_list) > highest_acc_sum):
+            highest_acc_sum = sum(acc_list)
             highest_acc_Q = Q_high
+            highest_acc_list = acc_list
+
+    M, test_example_idxs = get_train_and_test_examples_of_class_pair(highest_acc_Q[0:2])
+    remaining_classes = list(set(available_classes) - set(highest_acc_Q))
+
+    third_class_num = highest_acc_Q[2]
+    new_class_idxs = torch.nonzero((train_set.targets == third_class_num))
+    new_class_idxs = torch.squeeze(new_class_idxs).numpy().tolist()
+    M += new_class_idxs
+
+    new_test_example_idxs = torch.nonzero((test_set.targets == third_class_num))
+    new_test_example_idxs = torch.squeeze(new_test_example_idxs).numpy().tolist()
+    test_example_idxs += new_test_example_idxs
+
+    highest_acc_Q = find_next_class(highest_acc_Q, remaining_classes, M, test_example_idxs, highest_acc_list, high=True)
 else:
     # If thera aren't any fully separable pairs, use the pair with the highest acc value
     class_pair = highest_acc_pair[0]
