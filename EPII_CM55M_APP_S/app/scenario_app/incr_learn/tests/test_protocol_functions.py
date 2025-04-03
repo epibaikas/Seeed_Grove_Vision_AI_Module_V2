@@ -79,13 +79,14 @@ def test_read_labels_buffer(seq_num, config, device_data, util, labels_buffer):
 def test_rand_greedy_subset_selection(seq_num, config, device_data, util, subset_idxs, expected_classifier, data_read_buffer):
     num_batches = math.floor(config['N_EEPROM_BUFFER'] / config['N_RAM_BUFFER'])
     num_examples_total = (1 + num_batches) * config['N_RAM_BUFFER']
+    time_measurements = np.zeros(2, dtype=np.uint64)
 
     predicted_labels = np.zeros(num_examples_total, dtype=np.uint8)
     optim_func_buffer = np.zeros(config['num_iter'], dtype=float)
 
     # Check random balanced subset selection ---------------------------------------------------------------------------
-    send_command(rand_greedy_subset_selection, seq_num=seq_num['value'], param_list=[config['num_iter'], 200], util=util,
-                 data_out=[subset_idxs, predicted_labels, optim_func_buffer])
+    send_command(evo_subset_selection, seq_num=seq_num['value'], param_list=[config['num_iter'], 200], util=util,
+                 data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
     increment_seq_num(seq_num)
 
     # Check if predicted labels match the expected predicted labels

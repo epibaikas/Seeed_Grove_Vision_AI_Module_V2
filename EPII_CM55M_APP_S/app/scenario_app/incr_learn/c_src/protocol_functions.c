@@ -9,6 +9,13 @@
 #include "protocol_functions.h"
 #include "util_functions.h"
 
+#ifdef HOST_PLATFORM
+    #include <sys/time.h>
+#elif defined(GROVE_VISION_WE2)
+    #include "hx_drv_timer.h"
+#endif
+
+
 void write_ram_buffer(struct FunctionArguments *fun_args) {
     int example_num = 0;
     int num_per_line = 8;
@@ -96,6 +103,25 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     int num_per_line = 8;
     int sscanf_ret_value = 0;
 
+    long seconds, sub_sel_micros, eeprom_update_micros;
+
+    #ifdef HOST_PLATFORM
+        struct timeval start, end;
+    #elif defined(GROVE_VISION_WE2)
+        TIMER_CFG_T timer_cfg = setup_timer();
+
+        TIMER_ID_E timer_id;
+        hx_drv_timer_get_available(&timer_id);
+
+        uint32_t clk_div = 6;
+        hx_drv_timer_set_clk_div(timer_id, clk_div, timer_cfg.state); // Original clk freq = 6 MHz, divide by 6 to get 1 MHz
+        uint32_t clk = 0;
+        hx_drv_timer_get_clk(timer_id, &clk); 
+
+        uint32_t time_start = 0;
+        uint32_t time_stop = 0;
+    #endif
+
     sscanf_ret_value = sscanf(fun_args->param, "%d %d",  &balanced_subset, &num_per_line);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: rand_subset_selection() parameters not parsed correctly\r\n");
@@ -115,11 +141,30 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     // Update the labels buffer
     update_labels_buffer(fun_args);
     
+    // Start time measurement for subset selection process
+    #ifdef HOST_PLATFORM
+        gettimeofday(&start, NULL);
+    #elif defined(GROVE_VISION_WE2)
+        hx_drv_timer_hw_start(timer_id, &timer_cfg, NULL);
+        time_start = hx_drv_timer_GetValue(timer_id);
+    #endif
+
     if (balanced_subset == 1) {
         get_random_bal_subset(fun_args->labels, subset_idxs, fun_args);
     } else {
         get_random_subset(fun_args->eeprom_buffer_size, fun_args->num_examples_total, subset_idxs);
     }
+
+    // Stop time measurement
+    #ifdef HOST_PLATFORM
+        gettimeofday(&end, NULL);
+        seconds = end.tv_sec - start.tv_sec;
+        sub_sel_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+    #elif defined(GROVE_VISION_WE2)
+        time_stop = hx_drv_timer_GetValue(timer_id);
+        sub_sel_micros = time_start - time_stop; // (Tick counter counts down instead of up)
+        hx_drv_timer_hw_stop(timer_id);
+    #endif
 
     // Classify all examples using the subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
@@ -130,9 +175,30 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     read_buffer(predicted_labels, fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
     xprintf("predicted_labels_read_done\r\n");
 
+    // Start time measurement for moving data to EEPROM
+    #ifdef HOST_PLATFORM
+        gettimeofday(&start, NULL);
+    #elif defined(GROVE_VISION_WE2)
+        hx_drv_timer_hw_start(timer_id, &timer_cfg, NULL);
+        time_start = hx_drv_timer_GetValue(timer_id);
+    #endif
+
     // Move subset data examples located in RAM to EEPROM
     move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
     
+    // Stop time measurement
+    #ifdef HOST_PLATFORM
+        gettimeofday(&end, NULL);
+        seconds = end.tv_sec - start.tv_sec;
+        eeprom_update_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+        xprintf("Time measurements (us): %u, %u\r\n", sub_sel_micros, eeprom_update_micros);
+    #elif defined(GROVE_VISION_WE2)
+        time_stop = hx_drv_timer_GetValue(timer_id);    
+        eeprom_update_micros = time_start - time_stop;
+        hx_drv_timer_hw_stop(timer_id);
+        xprintf("Time measurements (us): %u, %u: clk = %u, clk_div = %u, timer_id = %u\r\n", sub_sel_micros, eeprom_update_micros, clk, clk_div, timer_id);
+    #endif
+
     fun_args->num_examples_in_eeprom = fun_args->eeprom_buffer_size;
 
     free(subset_idxs);
@@ -150,6 +216,25 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     char avg_class_acc_str[10];
 
     float mutation_rate = 0.1;
+
+    long seconds, sub_sel_micros, eeprom_update_micros;
+
+    #ifdef HOST_PLATFORM
+        struct timeval start, end;
+    #elif defined(GROVE_VISION_WE2)
+        TIMER_CFG_T timer_cfg = setup_timer();
+
+        TIMER_ID_E timer_id;
+        hx_drv_timer_get_available(&timer_id);
+
+        uint32_t clk_div = 6;
+        hx_drv_timer_set_clk_div(timer_id, clk_div, timer_cfg.state); // Original clk freq = 6 MHz, divide by 6 to get 1 MHz
+        uint32_t clk = 0;
+        hx_drv_timer_get_clk(timer_id, &clk); 
+
+        uint32_t time_start = 0;
+        uint32_t time_stop = 0;
+    #endif
 
     sscanf_ret_value = sscanf(fun_args->param, "%d %d", &num_iter, &num_per_line);
     if (sscanf_ret_value <= 0) {
@@ -171,6 +256,14 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
 
     // Update the labels buffer
     update_labels_buffer(fun_args);
+
+    // Start time measurement for subset selection process
+    #ifdef HOST_PLATFORM
+        gettimeofday(&start, NULL);
+    #elif defined(GROVE_VISION_WE2)
+        hx_drv_timer_hw_start(timer_id, &timer_cfg, NULL);
+        time_start = hx_drv_timer_GetValue(timer_id);
+    #endif
 
     // Generate initial random balanced subset
     get_random_bal_subset(fun_args->labels, subset_idxs, fun_args);
@@ -204,6 +297,17 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
         optim_func_buffer[i] = max_avg_class_acc;
     }
 
+    // Stop time measurement
+    #ifdef HOST_PLATFORM
+        gettimeofday(&end, NULL);
+        seconds = end.tv_sec - start.tv_sec;
+        sub_sel_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+    #elif defined(GROVE_VISION_WE2)
+        time_stop = hx_drv_timer_GetValue(timer_id);
+        sub_sel_micros = time_start - time_stop; // (Tick counter counts down instead of up)
+        hx_drv_timer_hw_stop(timer_id);
+    #endif
+
     // Get label predictions using the latest subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
 
@@ -215,8 +319,29 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
     read_buffer(optim_func_buffer, num_iter, sizeof(float), num_per_line);
     xprintf("optim_func_buffer_read_done\r\n");
 
+    // Start time measurement for moving data to EEPROM
+    #ifdef HOST_PLATFORM
+        gettimeofday(&start, NULL);
+    #elif defined(GROVE_VISION_WE2)
+        hx_drv_timer_hw_start(timer_id, &timer_cfg, NULL);
+        time_start = hx_drv_timer_GetValue(timer_id);
+    #endif
+
     // Move subset data examples located in RAM to EEPROM
     move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
+
+    // Stop time measurement
+    #ifdef HOST_PLATFORM
+        gettimeofday(&end, NULL);
+        seconds = end.tv_sec - start.tv_sec;
+        eeprom_update_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+        xprintf("Time measurements (us): %u, %u\r\n", sub_sel_micros, eeprom_update_micros);
+    #elif defined(GROVE_VISION_WE2)
+        time_stop = hx_drv_timer_GetValue(timer_id);    
+        eeprom_update_micros = time_start - time_stop;
+        hx_drv_timer_hw_stop(timer_id);
+        xprintf("Time measurements (us): %u, %u: clk = %u, clk_div = %u, timer_id = %u\r\n", sub_sel_micros, eeprom_update_micros, clk, clk_div, timer_id);
+    #endif
 
     fun_args->num_examples_in_eeprom = fun_args->eeprom_buffer_size;
 
@@ -239,6 +364,25 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     float best_fitness = 0.0;
 
     char fitness_str[10];
+
+    long seconds, sub_sel_micros, eeprom_update_micros;
+
+    #ifdef HOST_PLATFORM
+        struct timeval start, end;
+    #elif defined(GROVE_VISION_WE2)
+        TIMER_CFG_T timer_cfg = setup_timer();
+
+        TIMER_ID_E timer_id;
+        hx_drv_timer_get_available(&timer_id);
+
+        uint32_t clk_div = 6;
+        hx_drv_timer_set_clk_div(timer_id, clk_div, timer_cfg.state); // Original clk freq = 6 MHz, divide by 6 to get 1 MHz
+        uint32_t clk = 0;
+        hx_drv_timer_get_clk(timer_id, &clk); 
+
+        uint32_t time_start = 0;
+        uint32_t time_stop = 0;
+    #endif
 
     sscanf_ret_value = sscanf(fun_args->param, "%d %d", &num_gen, &num_per_line);
     if (sscanf_ret_value <= 0) {
@@ -274,6 +418,14 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
 
     // Update the labels buffer
     update_labels_buffer(fun_args);
+
+    // Start time measurement for subset selection process
+    #ifdef HOST_PLATFORM
+        gettimeofday(&start, NULL);
+    #elif defined(GROVE_VISION_WE2)
+        hx_drv_timer_hw_start(timer_id, &timer_cfg, NULL);
+        time_start = hx_drv_timer_GetValue(timer_id);
+    #endif
 
     // Generate initial population and compute fitness scores
     for (int i = 0; i < population_size; i++) {
@@ -359,6 +511,17 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
         xprintf("\r\n");
     }
 
+    // Stop time measurement
+    #ifdef HOST_PLATFORM
+        gettimeofday(&end, NULL);
+        seconds = end.tv_sec - start.tv_sec;
+        sub_sel_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+    #elif defined(GROVE_VISION_WE2)
+        time_stop = hx_drv_timer_GetValue(timer_id);
+        sub_sel_micros = time_start - time_stop; // (Tick counter counts down instead of up)
+        hx_drv_timer_hw_stop(timer_id);
+    #endif
+
     // Get label predictions using the latest subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
 
@@ -370,8 +533,29 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     read_buffer(optim_func_buffer, num_gen, sizeof(float), num_per_line);
     xprintf("optim_func_buffer_read_done\r\n");
 
+    // Start time measurement for moving data to EEPROM
+    #ifdef HOST_PLATFORM
+        gettimeofday(&start, NULL);
+    #elif defined(GROVE_VISION_WE2)
+        hx_drv_timer_hw_start(timer_id, &timer_cfg, NULL);
+        time_start = hx_drv_timer_GetValue(timer_id);
+    #endif
+
     // Move subset data examples located in RAM to EEPROM
     move_subset_to_eeprom(subset_idxs, fun_args->eeprom_buffer_size, fun_args);
+
+    // Stop time measurement
+    #ifdef HOST_PLATFORM
+        gettimeofday(&end, NULL);
+        seconds = end.tv_sec - start.tv_sec;
+        eeprom_update_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+        xprintf("Time measurements (us): %u, %u\r\n", sub_sel_micros, eeprom_update_micros);
+    #elif defined(GROVE_VISION_WE2)
+        time_stop = hx_drv_timer_GetValue(timer_id);    
+        eeprom_update_micros = time_start - time_stop;
+        hx_drv_timer_hw_stop(timer_id);
+        xprintf("Time measurements (us): %u, %u: clk = %u, clk_div = %u, timer_id = %u\r\n", sub_sel_micros, eeprom_update_micros, clk, clk_div, timer_id);
+    #endif
 
     fun_args->num_examples_in_eeprom = fun_args->eeprom_buffer_size;
 

@@ -113,3 +113,13 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
 
     free(eeprom_indices_not_in_subset);
 }
+
+TIMER_CFG_T setup_timer() {
+    TIMER_CFG_T timer_cfg;
+    timer_cfg.period = UINT32_MAX; // (ms)
+    timer_cfg.mode = TIMER_MODE_PERIODICAL;
+    timer_cfg.state = TIMER_STATE_DC;
+    timer_cfg.ctrl = TIMER_CTRL_CPU;
+
+    return timer_cfg;
+}

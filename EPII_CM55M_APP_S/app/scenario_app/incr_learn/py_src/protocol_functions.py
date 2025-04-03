@@ -200,6 +200,20 @@ def rand_subset_selection(param_list, data_out, util):
     if resp_line != 'predicted_labels_read_done':
         raise AssertionError('resp_line not properly received for predicted_labels')
 
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    resp_line_str = resp_line.split(':')[0].strip()
+    time_measurements = resp_line.split(':')[1].strip()
+    sub_sel_time = time_measurements.split(',')[0].strip()
+    eeprom_update_time = time_measurements.split(',')[1].strip()
+    if resp_line_str != 'Time measurements (us)':
+        raise AssertionError('resp_line not properly received for time measurements')
+
+    data_out[3] = [sub_sel_time, eeprom_update_time]
+
     return 0
 
 
@@ -248,6 +262,20 @@ def rand_greedy_subset_selection(param_list, data_out, util):
     if resp_line != 'optim_func_buffer_read_done':
         raise AssertionError('resp_line not properly received for optim_func_buffer')
 
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    resp_line_str = resp_line.split(':')[0].strip()
+    time_measurements = resp_line.split(':')[1].strip()
+    sub_sel_time = time_measurements.split(',')[0].strip()
+    eeprom_update_time = time_measurements.split(',')[1].strip()
+    if resp_line_str != 'Time measurements (us)':
+        raise AssertionError('resp_line not properly received for time measurements')
+
+    data_out[3] = [sub_sel_time, eeprom_update_time]
+
     return 0
 
 def evo_subset_selection(param_list, data_out, util):
@@ -294,6 +322,20 @@ def evo_subset_selection(param_list, data_out, util):
     resp_line = resp_line.replace('\r', '').replace('\n', '')
     if resp_line != 'optim_func_buffer_read_done':
         raise AssertionError('resp_line not properly received for optim_func_buffer')
+
+    resp_line = util['reader'].readline().decode()
+    debug_print(resp_line, end='', debug=util['debug'])
+    util['resp_logger'].info(resp_line.rstrip())
+
+    resp_line = resp_line.replace('\r', '').replace('\n', '')
+    resp_line_str = resp_line.split(':')[0].strip()
+    time_measurements = resp_line.split(':')[1].strip()
+    sub_sel_time = time_measurements.split(',')[0].strip()
+    eeprom_update_time = time_measurements.split(',')[1].strip()
+    if resp_line_str != 'Time measurements (us)':
+        raise AssertionError('resp_line not properly received for time measurements')
+
+    data_out[3] = [sub_sel_time, eeprom_update_time]
 
     return 0
 

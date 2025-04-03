@@ -136,6 +136,7 @@ if __name__ == '__main__':
     seq_num = 0
     subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
     optim_func_buffer = np.zeros(sel_func_param[0], dtype=float)
+    time_measurements = np.zeros(2, dtype=np.uint64)
 
     # Keep track of the data examples that are currently on the device
     device_data = np.zeros(shape=(config['N_TOTAL'], config['bytes_per_example']), dtype=np.uint8)
@@ -251,7 +252,7 @@ if __name__ == '__main__':
             # Run subset selection
             print('\tRunning subset selection...')
             send_command(sel_func, seq_num=seq_num, param_list=sel_func_param, util=util,
-                         data_out=[subset_idxs, predicted_labels, optim_func_buffer])
+                         data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
             seq_num += 1
 
             # Check that the predicted labels returned by the device match the expected ones
