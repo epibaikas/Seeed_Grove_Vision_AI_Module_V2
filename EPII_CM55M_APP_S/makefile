@@ -97,8 +97,9 @@ EPII_NSC_SEL = cm55m_nsc_cfg
 # other for disable
 ##
 LIB_CMSIS_NN_ENALBE = 1
-## 0 : default version
-LIB_CMSIS_NN_VERSION = 0
+## 0 : default version (tflmtag2209_u55tag2205)
+## 7_0_0 : cmsis_nn_7_0_0 (tflmtag2412_u55tag2411)
+LIB_CMSIS_NN_VERSION = 7_0_0
 
 # USING Pre-built CV library
 # 1 for enable
@@ -134,6 +135,7 @@ CUSTOMER ?= seeed
 # allon_sensor_tflm_cmsis_nn (LIB_CMSIS_NN_ENALBE = 1)
 # allon_sensor_tflm_fatfs
 # allon_sensor_tflm_freertos
+# allon_jpeg_encode
 # fatfs_mmc_spi
 # hello_world_freertos_tz_s_only
 # tflm_fd_fm
@@ -150,6 +152,8 @@ CUSTOMER ?= seeed
 # tflm_peoplenet
 # hello_world
 # incr_learn
+# tflm_yolo11_od
+# tflm_yolov8_gender_cls
 ##
 APP_TYPE = incr_learn
  

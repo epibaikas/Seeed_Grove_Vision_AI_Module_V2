@@ -49,6 +49,19 @@
 #endif
 
 
+#ifdef ALLON_JPEG_ENCODE
+#include "allon_jpeg_encode.h"
+
+/** main entry */
+int main(void)
+{
+	board_init();
+	app_main();
+	return 0;
+}
+#endif
+
+
 #ifdef ALLON_SENSOR_TFLM
 #include "allon_sensor_tflm.h"
 
@@ -139,6 +152,28 @@ int main(void)
 }
 #endif
 
+#ifdef TFLM_YOLOV8_GENDER_CLS
+#include "tflm_yolov8_gender_cls.h"
+
+/** main entry */
+int main(void)
+{
+	board_init();
+	tflm_yolov8_gender_cls_app();
+	return 0;
+}
+#endif
+
+#ifdef TFLM_YOLO11_OD
+#include "tflm_yolo11_od.h"
+/** main entry */
+int main(void)
+{
+	board_init();
+	tflm_yolo11_od_app();
+	return 0;
+}
+#endif
 
 #ifdef TFLM_YOLOV8_POSE
 #include "tflm_yolov8_pose.h"
