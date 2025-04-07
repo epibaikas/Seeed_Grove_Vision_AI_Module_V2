@@ -85,7 +85,7 @@ def test_rand_greedy_subset_selection(seq_num, config, device_data, util, subset
     optim_func_buffer = np.zeros(config['num_iter'], dtype=float)
 
     # Check random balanced subset selection ---------------------------------------------------------------------------
-    send_command(evo_subset_selection, seq_num=seq_num['value'], param_list=[config['num_iter'], 200], util=util,
+    send_command(rand_greedy_subset_selection, seq_num=seq_num['value'], param_list=[config['num_iter'], 200], util=util,
                  data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
     increment_seq_num(seq_num)
 
