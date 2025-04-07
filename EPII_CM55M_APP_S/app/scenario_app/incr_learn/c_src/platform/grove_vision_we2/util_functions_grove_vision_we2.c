@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include "spi_eeprom_comm.h"
 #include "arm_mve.h"
+#include "xprintf.h"
 
 #include "incr_learn.h"
 #include "util_functions.h"

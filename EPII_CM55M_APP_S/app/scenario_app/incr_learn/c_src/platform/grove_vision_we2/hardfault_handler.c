@@ -46,7 +46,7 @@ void HardFault_Handler(void) {
 		}
 		if (SAU->SFSR & SAU_SFSR_SFARVALID_Msk) {
 			/* SFARVALID: SFAR contain valid address that caused secure violation */
-			printf("Address that caused SAU violation is 0x%X.\r\n", SAU->SFAR);
+			printf("Address that caused SAU violation is 0x%lX.\r\n", SAU->SFAR);
 		}
 	}
 
@@ -64,7 +64,7 @@ void HardFault_Handler(void) {
 		}
 		if (SCB->CFSR & SCB_CFSR_BFARVALID_Msk) {
 			/* BFARVALID: BFAR contain valid address that caused secure violation */
-			printf("Address that caused secure bus violation is 0x%X.\r\n",
+			printf("Address that caused secure bus violation is 0x%lX.\r\n",
 					SCB->BFAR);
 		}
 	}
@@ -84,7 +84,7 @@ void HardFault_Handler(void) {
 		}
 		if (SCB_NS->CFSR & SCB_CFSR_BFARVALID_Msk) {
 			/* BFARVALID: BFAR contain valid address that caused secure violation */
-			printf("Address that caused secure bus violation is 0x%X.\r\n",
+			printf("Address that caused secure bus violation is 0x%lX.\r\n",
 					SCB_NS->BFAR);
 		}
 	}
@@ -94,9 +94,9 @@ void HardFault_Handler(void) {
     SCB->AIRCR =
         (SCB->AIRCR & ~SCB_AIRCR_VECTKEY_Msk) | (0x05FAUL << SCB_AIRCR_VECTKEY_Pos) | SCB_AIRCR_SYSRESETREQ_Msk;
 #else
-	printf("SCB->CFSR:0x%08x\n", SCB->CFSR);
-	printf("SCB->BFAR:0x%08x\n", SCB->BFAR);
-	printf("SCB->HFSR:0x%08x\n", SCB->HFSR);
+	printf("SCB->CFSR:0x%08lx\n", SCB->CFSR);
+	printf("SCB->BFAR:0x%08lx\n", SCB->BFAR);
+	printf("SCB->HFSR:0x%08lx\n", SCB->HFSR);
 	for (;;) {
 	}
 #endif
@@ -115,9 +115,9 @@ void MemManage_Handler(void) {
 }
 void BusFault_Handler(void) {
 	printf("\r\nEntering BusFault_Handler interrupt!\r\n");
-	printf("SCB->CFSR:0x%08x\n", SCB->CFSR);
-	printf("SCB->BFAR:0x%08x\n", SCB->BFAR);
-	printf("SCB->HFSR:0x%08x\n", SCB->HFSR);
+	printf("SCB->CFSR:0x%08lx\n", SCB->CFSR);
+	printf("SCB->BFAR:0x%08lx\n", SCB->BFAR);
+	printf("SCB->HFSR:0x%08lx\n", SCB->HFSR);
 	for (;;) {
 	}
 }

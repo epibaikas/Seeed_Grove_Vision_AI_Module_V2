@@ -77,7 +77,7 @@ void compute_dist_matrix(struct FunctionArguments *fun_args) {
     uint32_t bitshift = 0;
     int sscanf_ret_value = 0;
 
-    sscanf_ret_value = sscanf(fun_args->param, "%u", &bitshift);
+    sscanf_ret_value = sscanf(fun_args->param, "%lu", &bitshift);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: compute_dist_matrix() parameters not parsed correctly\r\n");
         exit(1);

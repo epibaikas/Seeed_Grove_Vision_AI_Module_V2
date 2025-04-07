@@ -103,10 +103,11 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     int num_per_line = 8;
     int sscanf_ret_value = 0;
 
-    long seconds, sub_sel_micros, eeprom_update_micros;
+    long sub_sel_micros, eeprom_update_micros;
 
     #ifdef HOST_PLATFORM
         struct timeval start, end;
+        long seconds;
     #elif defined(GROVE_VISION_WE2)
         TIMER_CFG_T timer_cfg = setup_timer();
 
@@ -212,15 +213,16 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
 
     float max_avg_class_acc = 0.0;
     float avg_class_acc = 0.0;
-    char max_avg_class_acc_str[10];
-    char avg_class_acc_str[10];
+    char max_avg_class_acc_str[45];
+    char avg_class_acc_str[45];
 
     float mutation_rate = 0.1;
 
-    long seconds, sub_sel_micros, eeprom_update_micros;
+    long sub_sel_micros, eeprom_update_micros;
 
     #ifdef HOST_PLATFORM
         struct timeval start, end;
+        long seconds;
     #elif defined(GROVE_VISION_WE2)
         TIMER_CFG_T timer_cfg = setup_timer();
 
@@ -363,12 +365,13 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
 
     float best_fitness = 0.0;
 
-    char fitness_str[10];
+    char fitness_str[45];
 
-    long seconds, sub_sel_micros, eeprom_update_micros;
+    long sub_sel_micros, eeprom_update_micros;
 
     #ifdef HOST_PLATFORM
         struct timeval start, end;
+        long seconds;
     #elif defined(GROVE_VISION_WE2)
         TIMER_CFG_T timer_cfg = setup_timer();
 
@@ -574,7 +577,7 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
     uint32_t num_of_classes;
     int sscanf_ret_value = 0;
 
-    sscanf_ret_value = sscanf(fun_args->param, "%u %u %u %u", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example, &num_of_classes);
+    sscanf_ret_value = sscanf(fun_args->param, "%lu %lu %lu %lu", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example, &num_of_classes);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: set_data_buffer_parameters() parameters not parsed correctly\r\n");
         exit(1);
@@ -682,7 +685,7 @@ void set_counters(struct FunctionArguments *fun_args) {
     uint32_t num_examples_in_eeprom = 0;
     int sscanf_ret_value = 0;
 
-    sscanf_ret_value = sscanf(fun_args->param, "%u %u", &num_examples_total, &num_examples_in_eeprom);
+    sscanf_ret_value = sscanf(fun_args->param, "%lu %lu", &num_examples_total, &num_examples_in_eeprom);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: set_counters() parameters not parsed correctly\r\n");
         exit(1);
