@@ -286,7 +286,7 @@ void write_buffer(uint8_t* buffer, uint32_t buffer_size, int num_per_line) {
 
         byte_idx = 0;
         data = line_buf;
-        while (sscanf(data, "%lu%n", &num, &offset) == 1 && byte_idx < num_per_line) {
+        while (sscanf(data, "%u%n", &num, &offset) == 1 && byte_idx < num_per_line) {
             buffer[i + byte_idx] = num;
             data += offset;
             byte_idx++;
