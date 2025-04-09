@@ -217,12 +217,12 @@ def rand_subset_selection(param_list, data_out, util):
     return 0
 
 
-def rand_greedy_subset_selection(param_list, data_out, util):
-    if len(param_list) != 2:
+def greedy_subset_selection(param_list, data_out, util):
+    if len(param_list) != 4:
         raise AssertionError('Incorrect param_list length')
 
-    num_iter = param_list[0]
     num_per_line = param_list[1]
+    num_iter = param_list[2]
 
     # debugging ----------------------------------------------
     # Prints the iterations of the greedy process
@@ -279,11 +279,11 @@ def rand_greedy_subset_selection(param_list, data_out, util):
     return 0
 
 def evo_subset_selection(param_list, data_out, util):
-    if len(param_list) != 2:
+    if len(param_list) != 6:
         raise AssertionError('Incorrect param_list length')
 
-    num_gen = param_list[0]
     num_per_line = param_list[1]
+    num_gen = param_list[2]
 
     # debugging ----------------------------------------------
     # Prints the iterations of the greedy process

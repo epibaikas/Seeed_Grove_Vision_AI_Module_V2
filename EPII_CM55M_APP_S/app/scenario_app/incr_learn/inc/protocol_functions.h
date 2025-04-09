@@ -43,7 +43,7 @@ void move_new_batch_to_eeprom(struct FunctionArguments *fun_args);
 
 void read_dist_matrix(struct FunctionArguments *fun_args);
 void rand_subset_selection(struct FunctionArguments *fun_args);
-void rand_greedy_subset_selection(struct FunctionArguments *fun_args);
+void greedy_subset_selection(struct FunctionArguments *fun_args);
 void evo_subset_selection(struct FunctionArguments *fun_args);
 
 void set_data_buffer_parameters(struct FunctionArguments *fun_args);

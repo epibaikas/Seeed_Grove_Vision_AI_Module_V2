@@ -132,7 +132,7 @@ seq_num += 1
 # Check correctness of read labels
 assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
-send_command(rand_greedy_subset_selection, seq_num=seq_num, param_list=[config['num_iter'], 200], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
+send_command(greedy_subset_selection, seq_num=seq_num, param_list=[1, 200, config['num_iter'], config['mutation_rate']], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
 seq_num += 1
 
 # Check if predicted labels match the expected predicted labels

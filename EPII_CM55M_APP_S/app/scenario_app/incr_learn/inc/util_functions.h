@@ -45,7 +45,8 @@ uint32_t get_num_correct_pred(uint8_t *labels, uint8_t *predicted_labels, struct
 
 void steady_state_parent_selection(uint16_t** population, uint32_t population_size, uint16_t** parents, uint32_t num_parents, uint8_t* max_fitness_idxs, struct FunctionArguments *fun_args);
 void single_point_crossover(uint16_t* par_1, uint16_t* par_2, uint16_t* offspring, struct  FunctionArguments *fun_args);
-void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, struct FunctionArguments *fun_args);
+
+void mutate_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, int balanced_subset, struct FunctionArguments *fun_args);
 
 void float_to_string(float num, char *str, int precision);
 #endif

@@ -18,9 +18,11 @@ if __name__ == '__main__':
                                      'experiments on Seeed Grove Vision AI Module V2')
 
     parser.add_argument('dataset', type=str, help='The name of the dataset to be used')
-    parser.add_argument('sub_sel_func', type=int, help='Subset selection function (\'0\' for random '
-                                                       'selection, \'1\' for random balanced selection, \'2\' for '
-                                                       'random greedy, \'3\' for evolutionary')
+    parser.add_argument('sub_sel_func', type=str, help='Subset selection function (\'rand\' for random'
+                                                       ' selection, \'greedy\' for greedy selection'
+                                                       ' and \'evo\' for evolutionary)')
+    parser.add_argument('bal', type=int, help='Enter \'1\' for maintaining class balancing in '
+                                                       'subsets, \'0\' otherwise')
     parser.add_argument('seq', type=str,
                         help='Enter \'high\' or  \'low\' for high\low accuracy sequence of classes respectively')
     parser.add_argument('ram_buf_size', type=positive_int,
@@ -29,18 +31,23 @@ if __name__ == '__main__':
                         help='The size of the EEPROM buffer given in KBs')
     parser.add_argument('trial', type=positive_int,
                         help='The experiment trial number used to adjust random seed for random sampling functions')
-    parser.add_argument('--target_dev', action='store_false', help='Use --device flag when experiment will be run on the actual device')
+    parser.add_argument('--target_dev', action='store_false', help='Use --target_dev flag when experiment will be run on the actual device')
 
     args = vars(parser.parse_args())
 
     # Get the arguments
     dataset_name = args['dataset']
     sub_sel_func = args['sub_sel_func']
+    bal = args['bal']
     seq_type = args['seq']
     ram_buf_size = args['ram_buf_size']
     eeprom_buf_size = args['eeprom_buf_size']
     trial = args['trial']
     target_dev = args['target_dev']
+
+    # Check that the balancing argument is valid:
+    if bal not in [0, 1]:
+        raise argparse.ArgumentTypeError('Invalid class balancing argument')
 
     # Check that the class sequence is valid
     if seq_type != 'high' and seq_type != 'low':
@@ -55,7 +62,8 @@ if __name__ == '__main__':
     random_seed = config['random_seed'] + trial
     np.random.seed(random_seed)
 
-    print(f'{dataset_name}, sub_sel_func={sub_sel_func}, seq_type={seq_type}, trial={trial}')
+    bal_str = '_bal' if bal == 1 else ''
+    print(f'{dataset_name}, sub_sel_func={sub_sel_func}{bal_str}, seq_type={seq_type}, trial={trial}')
 
     # Load dataset
     device = 'cpu'
@@ -100,24 +108,23 @@ if __name__ == '__main__':
     train_data[:, 0:config['data_bytes_per_example']] = X_train.astype(np.uint8)
     train_data[:, config['data_bytes_per_example']] = y_train.astype(np.uint8)
 
-    exp_param = (f'sub_selection_emulation={str(config["host"]).lower()}_seq={seq_type}_ram_buf_size={ram_buf_size}_eeprom_buf_size='
+    exp_param = (f'{dataset_name}_{sub_sel_func}{bal_str}_emulation={str(config["host"]).lower()}_seq={seq_type}_ram_buf_size={ram_buf_size}_eeprom_buf_size='
                  f'{eeprom_buf_size}_')
-    if sub_sel_func == 0:
-        filename_prefix = f'{dataset_name}_rand_' + exp_param + f'trial={trial}_'
+    if sub_sel_func == 'rand':
+        filename_prefix = exp_param + f'trial={trial}_'
         sel_func = rand_subset_selection
-        sel_func_param = [0, 200]
-    elif sub_sel_func == 1:
-        filename_prefix = f'{dataset_name}_rand_bal_' + exp_param + f'trial={trial}_'
-        sel_func = rand_subset_selection
-        sel_func_param = [1, 200]
-    elif sub_sel_func == 2:
-        filename_prefix = f'{dataset_name}_rand_greedy_' + exp_param + f'num_iter={config["num_iter"]}_trial={trial}_'
-        sel_func = rand_greedy_subset_selection
-        sel_func_param = [config['num_iter'], 200]
-    elif sub_sel_func == 3:
-        filename_prefix = f'{dataset_name}_evo_' + exp_param + f'num_gen={config["num_gen"]}_trial={trial}_'
+        sel_func_param = [bal, 200]
+    elif sub_sel_func == 'greedy':
+        filename_prefix = exp_param + f'num_iter={config["num_iter"]}_trial={trial}_'
+        sel_func = greedy_subset_selection
+        sel_func_param = [bal, 200, config['num_iter'], config['mutation_rate']]
+    elif sub_sel_func == 'evo':
+        filename_prefix = exp_param + f'num_gen={config["num_gen"]}_trial={trial}_'
         sel_func = evo_subset_selection
-        sel_func_param = [config['num_gen'], 200]
+        sel_func_param = [bal, 200, config['num_gen'], config['population_size'], config['num_parents'],
+                          config['mutation_rate']]
+    else:
+        raise argparse.ArgumentTypeError('Invalid subset selection function')
 
 
     # Class sequence
@@ -135,7 +142,7 @@ if __name__ == '__main__':
 
     seq_num = 0
     subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
-    optim_func_buffer = np.zeros(sel_func_param[0], dtype=float)
+    optim_func_buffer = np.zeros(sel_func_param[2], dtype=float) if sub_sel_func == 'greedy' or sub_sel_func == 'evo' else []
     time_measurements = np.zeros(2, dtype=np.uint64)
 
     # Keep track of the data examples that are currently on the device
@@ -307,7 +314,7 @@ if __name__ == '__main__':
 
             # Evaluate top-1 accuracy over the union of all train examples provided to the device up to this stage
             eval_classifier = kNearestNeighbors(X_train[EEPROM_trainset_idxs[t-1]], y_train[EEPROM_trainset_idxs[t-1]])
-            eval_classifier.train(X_train[train_set_union], symmetric=False, bitshift=config['bitshift'])
+            eval_classifier.train(X_train[train_set_union], symmetric=False, zero_to_max=True, bitshift=config['bitshift'])
             acc_train_set_union[t - 1] = ACC(eval_classifier, X_train[train_set_union], y_train[train_set_union], subset_idxs=[])
 
             # Evaluate top-1 accuracy over the complete test set, containing test examples from all classes.

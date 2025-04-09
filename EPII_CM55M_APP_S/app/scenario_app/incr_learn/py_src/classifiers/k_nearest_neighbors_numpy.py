@@ -24,20 +24,22 @@ class kNearestNeighbors(object):
         # the distance matrix in ascending distance order
         self.sorting_idxs = np.array([])
 
-    def train(self, X, symmetric=False, bitshift=0):
+    def train(self, X, symmetric=False, zero_to_max=False, bitshift=0):
         """
         Train the classifier. For a k-Nearest-Neighbors classifier, training involves computing a distance matrix
         with dimensions [num_test, num_train], between the training and test examples. In addition, the indices that
         sort each row of the distance matrix in ascending order are determined.
 
         :param X: A numpy array of shape [num_test, D] containing num_test test examples
-        each of dimension D.
+                each of dimension D.
         :param symmetric: Set to True if you want to compute a symmetric distance matrix that contains the distance
                         between every example in X_train
+        :param zero_to_max: Set to True if you want to set zero-valued cells that are not on the diagonal
+                        of the distance matrix to max uint16 value
         :param bitshift: Set to how many right bit-shifts will be applied to distance matrix values
         """
 
-        self.dists = self.compute_distances(X, symmetric, bitshift)
+        self.dists = self.compute_distances(X, symmetric, zero_to_max, bitshift)
 
         # Find the sorting indices for each row of the distance matrix
         self.sorting_idxs = np.argsort(self.dists, axis=1, kind='stable')
@@ -76,7 +78,7 @@ class kNearestNeighbors(object):
 
         return y_pred
 
-    def compute_distances(self, X, symmetric=False, bitshift=0):
+    def compute_distances(self, X, symmetric=False, zero_to_max=False, bitshift=0):
         """
         Compute the l2 distance matrix between each test point in X and each training point
         in self.X_train. The computation of the matrix has been implemented using only matrix operations
@@ -112,6 +114,9 @@ class kNearestNeighbors(object):
         if symmetric:
             for i in range(self.X_train.shape[0]):
                 dists[i, i] = 0xFFFF
+
+        if zero_to_max:
+            dists[np.where(dists < 1)] = 0xFFFF
 
         return dists.astype(np.uint16)
 

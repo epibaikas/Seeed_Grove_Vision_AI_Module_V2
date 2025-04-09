@@ -206,7 +206,8 @@ void rand_subset_selection(struct FunctionArguments *fun_args) {
     free(predicted_labels);
 }
 
-void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
+void greedy_subset_selection(struct FunctionArguments *fun_args) {
+    int balanced_subset = 0;
     int num_iter = 1; 
     int num_per_line = 8;
     int sscanf_ret_value = 0;
@@ -238,7 +239,7 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
         uint32_t time_stop = 0;
     #endif
 
-    sscanf_ret_value = sscanf(fun_args->param, "%d %d", &num_iter, &num_per_line);
+    sscanf_ret_value = sscanf(fun_args->param, "%d %d %d %f", &balanced_subset, &num_per_line, &num_iter, &mutation_rate);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: rand_subset_selection() parameters not parsed correctly\r\n");
         exit(1);
@@ -267,8 +268,13 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
         time_start = hx_drv_timer_GetValue(timer_id);
     #endif
 
-    // Generate initial random balanced subset
-    get_random_bal_subset(fun_args->labels, subset_idxs, fun_args);
+    // Generate initial subset
+    if (balanced_subset == 1) {
+        get_random_bal_subset(fun_args->labels, subset_idxs, fun_args);
+    } else {
+        get_random_subset(fun_args->eeprom_buffer_size, fun_args->num_examples_total, subset_idxs);
+    }
+
 
     // Classify all examples using the subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
@@ -281,7 +287,7 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
 
     for (int i = 0; i < num_iter; i++) {
         memcpy(candidate_subset_idxs, subset_idxs, fun_args->eeprom_buffer_size * sizeof(uint16_t));
-        mutate_bal_subset(candidate_subset_idxs, fun_args->labels, mutation_rate, fun_args);
+        mutate_subset(candidate_subset_idxs, fun_args->labels, mutation_rate, balanced_subset, fun_args);
 
         classify_training_set(fun_args, candidate_subset_idxs, predicted_labels);
 
@@ -353,6 +359,7 @@ void rand_greedy_subset_selection(struct FunctionArguments *fun_args) {
 }
 
 void evo_subset_selection(struct FunctionArguments *fun_args) {
+    int balanced_subset = 0;
     int num_gen = 1; 
     int num_per_line = 8;
     int sscanf_ret_value = 0;
@@ -387,7 +394,7 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
         uint32_t time_stop = 0;
     #endif
 
-    sscanf_ret_value = sscanf(fun_args->param, "%d %d", &num_gen, &num_per_line);
+    sscanf_ret_value = sscanf(fun_args->param, "%d %d %d %d %d %f", &balanced_subset, &num_per_line, &num_gen, &population_size, &num_parents, &mutation_rate);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: evo_subset_selection() parameters not parsed correctly\r\n");
         exit(1);
@@ -432,7 +439,11 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
 
     // Generate initial population and compute fitness scores
     for (int i = 0; i < population_size; i++) {
-        get_random_bal_subset(fun_args->labels, population[i], fun_args);
+        if (balanced_subset == 1) {
+            get_random_bal_subset(fun_args->labels, population[i], fun_args);
+        } else {
+            get_random_subset(fun_args->eeprom_buffer_size, fun_args->num_examples_total, population[i]);
+        }
 
         classify_training_set(fun_args, population[i], predicted_labels);
         fitness[i] = get_avg_class_acc(fun_args->labels, predicted_labels, fun_args);
@@ -456,15 +467,17 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
         steady_state_parent_selection(population, population_size, parents, num_parents, max_fitness_idxs, fun_args);
 
         for (int i = 0; i < num_parents; i++) {
-            // Sort the subset_idxs in a parent chromosome first in ascending order and then in ascending class label order
-            // The purpose of the double sorting is to avoid duplicates when combining chromosomes with single-point crossover
+            // Sort the subset_idxs from a parent chromosome in ascending order to avoid duplicate indices after single-point crossover
             qsort(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), compare_subset_indices);
 
-            #ifdef _GNU_SOURCE
-                qsort_r(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), compare_indices_uint8, fun_args->labels);
-            #else
-                qsort_r(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), fun_args->labels , compare_indices_uint8);
-            #endif
+            if (balanced_subset == 1) {
+                // Apply second sorting in ascending class label order to maintain class balancing
+                #ifdef _GNU_SOURCE
+                    qsort_r(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), compare_indices_uint8, fun_args->labels);
+                #else
+                    qsort_r(parents[i], fun_args->eeprom_buffer_size, sizeof(uint16_t), fun_args->labels , compare_indices_uint8);
+                #endif
+            } 
         }
 
         // Place the elite solutions directly to the new population
@@ -479,7 +492,7 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
             single_point_crossover(parents[(i - keep_elite) % num_parents], parents[(i - keep_elite + 1) % num_parents], population[i], fun_args);
 
             // Mutate generated offspring
-            mutate_bal_subset(population[i], fun_args->labels, mutation_rate, fun_args);
+            mutate_subset(population[i], fun_args->labels, mutation_rate, balanced_subset, fun_args);
 
             // Compute offspring's fitness score
             classify_training_set(fun_args, population[i], predicted_labels);
@@ -734,8 +747,8 @@ function_pointer lookup_function(char *command_name) {
         return &read_dist_matrix;
     } else if (strncmp(command_name, "rand_subset_selection", 22) == 0) {
         return &rand_subset_selection;
-    } else if (strncmp(command_name, "rand_greedy_subset_selection", 29) == 0) {
-        return &rand_greedy_subset_selection;
+    } else if (strncmp(command_name, "greedy_subset_selection", 29) == 0) {
+        return &greedy_subset_selection;
     } else if (strncmp(command_name, "evo_subset_selection", 21) == 0) {
         return &evo_subset_selection;
     } else if (strncmp(command_name, "set_random_seed", 16) == 0) {

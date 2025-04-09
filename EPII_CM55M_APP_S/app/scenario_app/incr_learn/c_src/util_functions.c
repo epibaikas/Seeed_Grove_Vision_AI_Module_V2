@@ -532,7 +532,7 @@ void single_point_crossover(uint16_t* par_1, uint16_t* par_2, uint16_t* offsprin
     // xprintf("\r\n");
 }
 
-void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, struct FunctionArguments *fun_args) {    
+void mutate_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_rate, int balanced_subset, struct FunctionArguments *fun_args) {    
     int idx = 0;
     uint32_t num_of_idxs_to_be_mutated = floor(mutation_rate * fun_args->eeprom_buffer_size);
     uint32_t num_of_available_idxs = fun_args->num_examples_total - fun_args->eeprom_buffer_size;
@@ -544,11 +544,19 @@ void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_ra
 
     uint8_t* in_subset = calloc(fun_args->num_examples_total, sizeof(uint8_t));
     uint16_t* idxs_not_in_subset = calloc(num_of_available_idxs, sizeof(uint16_t));
-    uint8_t* idxs_mutated = calloc(fun_args->eeprom_buffer_size, sizeof(uint8_t));
+    uint8_t* idxs_mutated = NULL;
 
-    if (in_subset == NULL || idxs_not_in_subset == NULL || idxs_mutated == NULL) {
-        xprintf("mem_error: memory allocation for in_subset, idxs_not_in_subset or idxs_mutated failed\r\n");
+    if (in_subset == NULL || idxs_not_in_subset == NULL) {
+        xprintf("mem_error: memory allocation for in_subset or idxs_not_in_subset failed\r\n");
 		exit(1);
+    }
+
+    if (balanced_subset == 1) {
+        idxs_mutated = calloc(fun_args->eeprom_buffer_size, sizeof(uint8_t));
+        if (idxs_mutated == NULL) {
+            xprintf("mem_error: memory allocation for idxs_mutated failed\r\n");
+            exit(1);
+        }
     }
     
     shuffle(subset_idxs, fun_args->eeprom_buffer_size);
@@ -568,26 +576,32 @@ void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_ra
     
     shuffle(idxs_not_in_subset, num_of_available_idxs);
     
-    uint8_t label = 0;
-    bool mutation_complete = false;
-    // Apply mutation
-    for (int i = 0; i < num_of_idxs_to_be_mutated; i++) {
-      // Get label of i-th example from idxs_not_in_subset
-      label = labels[idxs_not_in_subset[i]];
+    if (balanced_subset == 1) {
+        uint8_t label = 0;
+        bool mutation_complete = false;
+        // Apply mutation
+        for (int i = 0; i < num_of_idxs_to_be_mutated; i++) {
+            // Get label of i-th example from idxs_not_in_subset
+            label = labels[idxs_not_in_subset[i]];
 
-      idx = 0;
-      mutation_complete = false;
-      // Find the first idx within subset_idxs that has the same label and hasn't already been mutated 
-      while (mutation_complete == false && idx < fun_args->eeprom_buffer_size) {
-        if (label == labels[subset_idxs[idx]] && idxs_mutated[idx] != 1) {
-          subset_idxs[idx] = idxs_not_in_subset[i];
-          idxs_mutated[idx] = 1;
-          mutation_complete = true;
+            idx = 0;
+            mutation_complete = false;
+            // Find the first idx within subset_idxs that has the same label and hasn't already been mutated 
+            while (mutation_complete == false && idx < fun_args->eeprom_buffer_size) {
+                if (label == labels[subset_idxs[idx]] && idxs_mutated[idx] != 1) {
+                    subset_idxs[idx] = idxs_not_in_subset[i];
+                    idxs_mutated[idx] = 1;
+                    mutation_complete = true;
+                }
+            
+                idx++;
+            }
         }
-        
-        idx++;
-      }
-
+    } else {
+        // Apply mutation without worrying about maintaining balancing
+        for (int i = 0; i < num_of_idxs_to_be_mutated; i++) {
+            subset_idxs[i] = idxs_not_in_subset[i];
+        }
     }
 
     // xprintf("mutated offs: ");
@@ -598,8 +612,12 @@ void mutate_bal_subset(uint16_t* subset_idxs, uint8_t *labels, float mutation_ra
 
     free(in_subset);
     free(idxs_not_in_subset);
-    free(idxs_mutated);
+
+    if (balanced_subset == 1) {
+        free(idxs_mutated);
+    } 
 }
+
 
 void float_to_string(float num, char *str, int precision) {
     // Handle negative numbers
