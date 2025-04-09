@@ -90,8 +90,8 @@ seq_num = 0
 command_return_value = send_command(set_random_seed, seq_num=seq_num, param_list=[config['random_seed']], util=util)
 seq_num += 1
 
-command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
-                                    config['N_EEPROM_BUFFER'], config['bytes_per_example'], num_of_classes], util=util)
+command_return_value = send_command(set_exp_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
+                                    config['N_EEPROM_BUFFER'], config['bytes_per_example'], num_of_classes, config['k_kNN']], util=util)
 seq_num += 1
 
 for i in range(config['N_TOTAL']):
@@ -136,7 +136,7 @@ send_command(greedy_subset_selection, seq_num=seq_num, param_list=[1, 200, confi
 seq_num += 1
 
 # Check if predicted labels match the expected predicted labels
-expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=3)
+expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=config['k_kNN'])
 
 for i, _ in enumerate(predicted_labels):
     print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))

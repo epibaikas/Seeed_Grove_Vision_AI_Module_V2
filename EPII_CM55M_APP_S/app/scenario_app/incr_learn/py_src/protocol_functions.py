@@ -384,11 +384,11 @@ def read_buffer(array, size, num_per_line, util):
         util['req_logger'].debug(ack_msg)
 
 
-def set_data_buffer_parameters(param_list, util):
-    if len(param_list) != 4:
+def set_exp_parameters(param_list, util):
+    if len(param_list) != 5:
         raise AssertionError('Incorrect param_list length')
 
-    for i in range(15):
+    for i in range(16):
         resp_line = util['reader'].readline().decode()
         debug_print(resp_line, end='', debug=util['debug'])
         util['resp_logger'].info(resp_line.rstrip())

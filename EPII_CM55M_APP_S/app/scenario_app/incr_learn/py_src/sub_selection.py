@@ -207,10 +207,10 @@ if __name__ == '__main__':
     seq_num += 1
 
     # Set data buffer parameters -----------------------------------------------------------------------------------
-    send_command(set_data_buffer_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
+    send_command(set_exp_parameters, seq_num=seq_num, param_list=[config['N_RAM_BUFFER'],
                                                                           config['N_EEPROM_BUFFER'],
                                                                           config['bytes_per_example'],
-                                                                          num_of_classes], util=util)
+                                                                          num_of_classes, config['k_kNN']], util=util)
     seq_num += 1
 
     # Get a batch of examples from every class in the sequence, write it to RAM BUFFER, perform subset selection if ----
@@ -267,7 +267,7 @@ if __name__ == '__main__':
             expected_classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=config['bitshift'])
 
             expected_predicted_labels = expected_classifier.predict(device_data[:, 0:config['data_bytes_per_example']],
-                                        subset_idxs, train_classifier=False, k=3)
+                                        subset_idxs, train_classifier=False, k=config['k_kNN'])
             assert np.array_equal(expected_predicted_labels[0:num_examples_total], predicted_labels)
             # for i in range(num_examples_total):
             #     print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is',
@@ -304,21 +304,21 @@ if __name__ == '__main__':
         train_set_union = []
         for i in range(t):
             # Evaluate top-1 accuracy on the test set from each stage using the current subset of examples in EEPROM
-            acc_matrix[t - 1, i] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1], test_subset_idxs=test_sets[i])
+            acc_matrix[t - 1, i] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1], test_subset_idxs=test_sets[i], k_kNN=config['k_kNN'])
             test_set_union += test_sets[i]
             train_set_union += train_sets[i]
 
         if t > 0:
             # Evaluate top-1 accuracy over the union of all test sets from the classes available up to this stage
-            acc_test_set_union[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1], test_subset_idxs=test_set_union)
+            acc_test_set_union[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1], test_subset_idxs=test_set_union, k_kNN=config['k_kNN'])
 
             # Evaluate top-1 accuracy over the union of all train examples provided to the device up to this stage
             eval_classifier = kNearestNeighbors(X_train[EEPROM_trainset_idxs[t-1]], y_train[EEPROM_trainset_idxs[t-1]])
             eval_classifier.train(X_train[train_set_union], symmetric=False, zero_to_max=True, bitshift=config['bitshift'])
-            acc_train_set_union[t - 1] = ACC(eval_classifier, X_train[train_set_union], y_train[train_set_union], subset_idxs=[])
+            acc_train_set_union[t - 1] = ACC(eval_classifier, X_train[train_set_union], y_train[train_set_union], subset_idxs=[], k_kNN=config['k_kNN'])
 
             # Evaluate top-1 accuracy over the complete test set, containing test examples from all classes.
-            acc_global[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1])
+            acc_global[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1], k_kNN=config['k_kNN'])
 
     # Create results directory if it doesn't exist
     if not os.path.exists(config['results_dir_path']):

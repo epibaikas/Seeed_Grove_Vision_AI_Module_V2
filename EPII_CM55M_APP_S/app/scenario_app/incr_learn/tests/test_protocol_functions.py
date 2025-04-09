@@ -12,10 +12,11 @@ def test_set_random_seed(seq_num, config, util):
     increment_seq_num(seq_num)
     assert command_return_value == 0
 
-def test_set_data_buffer_parameters(seq_num, config, dataset, util):
-    command_return_value = send_command(set_data_buffer_parameters, seq_num=seq_num['value'],
+def test_set_exp_parameters(seq_num, config, dataset, util):
+    command_return_value = send_command(set_exp_parameters, seq_num=seq_num['value'],
                                         param_list=[config['N_RAM_BUFFER'], config['N_EEPROM_BUFFER'],
-                                                    config['bytes_per_example'], dataset['num_of_classes']], util=util)
+                                                    config['bytes_per_example'], dataset['num_of_classes'],
+                                                    config['k_kNN']], util=util)
     increment_seq_num(seq_num)
     assert command_return_value == 0
 
@@ -93,7 +94,7 @@ def test_greedy_subset_selection(seq_num, config, dataset, device_data, util, su
     increment_seq_num(seq_num)
 
     # Check if predicted labels match the expected predicted labels
-    expected_predicted_labels = expected_classifier.predict(device_data[0:num_examples_total, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=3)
+    expected_predicted_labels = expected_classifier.predict(device_data[0:num_examples_total, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=config['k_kNN'])
     assert np.array_equal(expected_predicted_labels[0:num_examples_total], predicted_labels)
 
     # Check if RAM subset data have been transferred correctly to EEPROM

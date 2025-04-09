@@ -241,7 +241,7 @@ void greedy_subset_selection(struct FunctionArguments *fun_args) {
 
     sscanf_ret_value = sscanf(fun_args->param, "%d %d %d %f", &balanced_subset, &num_per_line, &num_iter, &mutation_rate);
     if (sscanf_ret_value <= 0) {
-        xprintf("ack_error: rand_subset_selection() parameters not parsed correctly\r\n");
+        xprintf("ack_error: greedy_subset_selection() parameters not parsed correctly\r\n");
         exit(1);
     }
     
@@ -583,21 +583,22 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     free(optim_func_buffer);
 }
 
-void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
+void set_exp_parameters(struct FunctionArguments *fun_args) {
     uint32_t ram_buffer_size;
     uint32_t eeprom_buffer_size;
     uint32_t bytes_per_example;
     uint32_t num_of_classes;
+    uint32_t k_kNN;
     int sscanf_ret_value = 0;
 
     #ifdef HOST_PLATFORM
-        sscanf_ret_value = sscanf(fun_args->param, "%u %u %u %u", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example, &num_of_classes);
+        sscanf_ret_value = sscanf(fun_args->param, "%u %u %u %u %u", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example, &num_of_classes, &k_kNN);
     #elif defined(GROVE_VISION_WE2)
-        sscanf_ret_value = sscanf(fun_args->param, "%lu %lu %lu %lu", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example, &num_of_classes);
+        sscanf_ret_value = sscanf(fun_args->param, "%lu %lu %lu %lu %lu", &ram_buffer_size, &eeprom_buffer_size, &bytes_per_example, &num_of_classes, &k_kNN);
     #endif
 
     if (sscanf_ret_value <= 0) {
-        xprintf("ack_error: set_data_buffer_parameters() parameters not parsed correctly\r\n");
+        xprintf("ack_error: set_exp_parameters() parameters not parsed correctly\r\n");
         exit(1);
     }
 
@@ -610,6 +611,7 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
     fun_args->data_bytes_per_example = bytes_per_example - 1;
     fun_args->examples_per_eeprom_sector = EEPROM_SECTOR_SIZE / bytes_per_example;
     fun_args->num_of_classes = num_of_classes;
+    fun_args->k_kNN = k_kNN;
     fun_args->num_examples_in_eeprom = 0;
     fun_args->num_examples_total = 0;
 
@@ -669,6 +671,7 @@ void set_data_buffer_parameters(struct FunctionArguments *fun_args) {
     xprintf("data_bytes_per_example: %u\r\n", fun_args->data_bytes_per_example);
     xprintf("examples_per_eeprom_sector: %u\r\n", fun_args->examples_per_eeprom_sector);
     xprintf("num_of_classes: %u\r\n", fun_args->num_of_classes);
+    xprintf("k_KNN: %u\r\n", fun_args->k_kNN);
     xprintf("num_examples_in_eeprom: %u\r\n", fun_args->num_examples_in_eeprom);
     xprintf("num_examples_total: %u\r\n", fun_args->num_examples_total);
 
@@ -755,8 +758,8 @@ function_pointer lookup_function(char *command_name) {
         return &set_random_seed;
     } else if (strncmp(command_name, "set_counters", 23) == 0) {
         return &set_counters;
-    } else if (strncmp(command_name, "set_data_buffer_parameters", 27) == 0) {
-        return &set_data_buffer_parameters;
+    } else if (strncmp(command_name, "set_exp_parameters", 27) == 0) {
+        return &set_exp_parameters;
     } else if (strncmp(command_name, "stop", 4) == 0) {
         return &stop; 
     } else {

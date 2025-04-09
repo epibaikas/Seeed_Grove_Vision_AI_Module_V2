@@ -22,8 +22,6 @@
 #define COMMAND_NAME_LEN 30
 #define PARAM_LEN 100
 
-#define kNN_k 3
-
 int app_main(void);
 
 #endif

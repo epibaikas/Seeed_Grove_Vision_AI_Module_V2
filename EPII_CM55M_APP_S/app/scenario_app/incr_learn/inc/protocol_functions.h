@@ -24,6 +24,7 @@ struct FunctionArguments {
   uint8_t *eeprom_sector_buffer;
   uint16_t *dist_matrix;
   uint8_t *labels;
+  unsigned int k_kNN;
   unsigned int random_seed;
 };
 
@@ -46,7 +47,7 @@ void rand_subset_selection(struct FunctionArguments *fun_args);
 void greedy_subset_selection(struct FunctionArguments *fun_args);
 void evo_subset_selection(struct FunctionArguments *fun_args);
 
-void set_data_buffer_parameters(struct FunctionArguments *fun_args);
+void set_exp_parameters(struct FunctionArguments *fun_args);
 void set_random_seed(struct FunctionArguments *fun_args);
 void set_num_examples_total(struct FunctionArguments *fun_args);
 

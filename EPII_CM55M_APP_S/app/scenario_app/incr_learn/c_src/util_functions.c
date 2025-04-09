@@ -445,7 +445,7 @@ void classify_training_set(struct FunctionArguments *fun_args, uint16_t *subset_
         }
 
         // xprintf("Example %d, Nearest Neighbhours: [%u, %u, %u, %u, %u] \r\n", i, indices[0], indices[1], indices[2], indices[3], indices[4]);
-        predicted_labels[i] = predict_label(indices, fun_args->labels, kNN_k, fun_args);
+        predicted_labels[i] = predict_label(indices, fun_args->labels, fun_args->k_kNN, fun_args);
     }
 
     free(temp_dist_buf);
