@@ -76,7 +76,7 @@ def test_read_labels_buffer(seq_num, config, device_data, util, labels_buffer):
     assert np.array_equal(device_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
 
-def test_rand_greedy_subset_selection(seq_num, config, device_data, util, subset_idxs, expected_classifier, data_read_buffer):
+def test_greedy_subset_selection(seq_num, config, dataset, device_data, util, subset_idxs, expected_classifier, data_read_buffer):
     num_batches = math.floor(config['N_EEPROM_BUFFER'] / config['N_RAM_BUFFER'])
     num_examples_total = (1 + num_batches) * config['N_RAM_BUFFER']
     time_measurements = np.zeros(2, dtype=np.uint64)
@@ -84,8 +84,11 @@ def test_rand_greedy_subset_selection(seq_num, config, device_data, util, subset
     predicted_labels = np.zeros(num_examples_total, dtype=np.uint8)
     optim_func_buffer = np.zeros(config['num_iter'], dtype=float)
 
+    bal = 1
+    param_list = [bal, 200,  config['num_iter'], config['mutation_rate']]
+
     # Check random balanced subset selection ---------------------------------------------------------------------------
-    send_command(rand_greedy_subset_selection, seq_num=seq_num['value'], param_list=[config['num_iter'], 200], util=util,
+    send_command(greedy_subset_selection, seq_num=seq_num['value'], param_list=param_list, util=util,
                  data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
     increment_seq_num(seq_num)
 
@@ -106,6 +109,16 @@ def test_rand_greedy_subset_selection(seq_num, config, device_data, util, subset
     # Check that all elements of subset_idxs are unique
     assert len(subset_idxs) == len(subset_idxs_set)
     assert len(ram_subset_idxs) == len(eeprom_idxs_to_be_overwritten)
+
+    # Check balancing
+    if bal == 1:
+        labels = device_data[subset_idxs, config['data_bytes_per_example']]
+
+        unique_labels, label_counts = np.unique(labels, return_counts=True)
+        expected_num_examples_per_class = int(config['N_EEPROM_BUFFER'] / len(unique_labels))
+
+        for label_count in label_counts:
+            assert label_count == expected_num_examples_per_class or label_count == expected_num_examples_per_class + 1
 
     for i, eeprom_idx in enumerate(eeprom_idxs_to_be_overwritten):
         send_command(read_eeprom, seq_num=seq_num['value'], param_list=[(eeprom_idx - config['N_RAM_BUFFER']), config['num_per_line'], config['bytes_per_example']],
