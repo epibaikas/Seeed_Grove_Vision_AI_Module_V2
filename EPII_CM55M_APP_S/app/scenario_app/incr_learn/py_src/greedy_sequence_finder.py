@@ -23,7 +23,7 @@ def get_train_and_test_examples_of_class_pair(class_pair):
     return M, test_example_idxs
 
 
-def find_next_class(Q, available_classes, M, test_example_idxs, acc_list, first_pair=False, high=True):
+def find_next_class(Q, available_classes, M, test_example_idxs, acc_list, k_kNN, first_pair=False, high=True):
     if len(available_classes) == 0:
         return Q
     else:
@@ -38,7 +38,8 @@ def find_next_class(Q, available_classes, M, test_example_idxs, acc_list, first_
             new_test_example_idxs = torch.squeeze(new_test_example_idxs).numpy().tolist()
 
             acc = ACC(classifier, X_test, y_test,
-                      subset_idxs=M + new_class_idxs, test_subset_idxs=test_example_idxs + new_test_example_idxs)
+                      subset_idxs=M + new_class_idxs, test_subset_idxs=test_example_idxs + new_test_example_idxs,
+                      k_kNN=k_kNN)
 
             # print('Q =', Q, ', new class', class_num, ' acc = ' + f'{acc:.5f}')
             if (acc > highest_acc_class[1]):
@@ -68,10 +69,10 @@ def find_next_class(Q, available_classes, M, test_example_idxs, acc_list, first_
         if first_pair:
             return Q
         else:
-            return find_next_class(Q, available_classes, M, test_example_idxs, acc_list, first_pair=False, high=high)
+            return find_next_class(Q, available_classes, M, test_example_idxs, acc_list, k_kNN, first_pair=False, high=high)
 
 
-def find_first_pair(available_classes):
+def find_first_pair(available_classes, k_kNN):
     highest_acc_pair = ([-1, -1], 0.0)
     lowest_acc_pair = ([-1, -1], 1.0)
     fully_separable_pairs = []
@@ -85,7 +86,7 @@ def find_first_pair(available_classes):
             M, test_example_idxs = get_train_and_test_examples_of_class_pair(Q)
 
             acc = ACC(classifier, X_test, y_test, subset_idxs=M,
-                      test_subset_idxs=test_example_idxs)
+                      test_subset_idxs=test_example_idxs, k_kNN=k_kNN)
 
             print('Q =', Q, ' acc = ' + f'{acc:.5f}')
 
@@ -150,6 +151,17 @@ else:
     np.save(path_1, classifier.dists)
     np.save(path_2, classifier.sorting_idxs)
 
+k_kNN = 1
+max_acc = 0
+for k in [1, 3, 5, 7, 9, 11]:
+    acc = ACC(classifier, X_test, y_test, subset_idxs=[], k_kNN=k)
+    print(f'k_kNN = {k}, Top-1 test accuracy = {acc}')
+    if acc > max_acc:
+        max_acc = acc
+        k_kNN = k
+print(f'Best k_kNN = {k_kNN}')
+np.save(config['artifacts_dir_path'] + dataset_name + '_k_kNN.npy', np.array(k_kNN))
+
 # Create a list of available class numbers out of which a sequence can be created
 available_classes = [x for x in range(len(train_set.classes))]
 
@@ -160,7 +172,7 @@ if os.path.isfile(config['artifacts_dir_path'] + dataset_name + '_sequence_first
         highest_acc_pair, lowest_acc_pair, fully_separable_pairs = pickle.load(handle)
 else:
     print('Finding first class pairs of the sequence...')
-    highest_acc_pair, lowest_acc_pair, fully_separable_pairs = find_first_pair(available_classes)
+    highest_acc_pair, lowest_acc_pair, fully_separable_pairs = find_first_pair(available_classes, k_kNN)
     print('Saving first sequence pairs to file...')
     with open(config['artifacts_dir_path'] + dataset_name + '_sequence_first_pairs.pkl', 'wb') as handle:
         pickle.dump((highest_acc_pair, lowest_acc_pair, fully_separable_pairs), handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -177,7 +189,7 @@ if len(fully_separable_pairs) > 1:
         acc_list = [1.0]
 
         remaining_classes = list(set(available_classes) - set(class_pair))
-        Q_high = find_next_class(class_pair, remaining_classes, M, test_example_idxs, acc_list, first_pair=True, high=True)
+        Q_high = find_next_class(class_pair, remaining_classes, M, test_example_idxs, acc_list, k_kNN, first_pair=True, high=True)
 
         # Select the sequence whose sum of accuracies is the highest
         if (sum(acc_list) > highest_acc_sum):
@@ -197,7 +209,7 @@ if len(fully_separable_pairs) > 1:
     new_test_example_idxs = torch.squeeze(new_test_example_idxs).numpy().tolist()
     test_example_idxs += new_test_example_idxs
 
-    highest_acc_Q = find_next_class(highest_acc_Q, remaining_classes, M, test_example_idxs, highest_acc_list, high=True)
+    highest_acc_Q = find_next_class(highest_acc_Q, remaining_classes, M, test_example_idxs, highest_acc_list, k_kNN, high=True)
 else:
     # If thera aren't any fully separable pairs, use the pair with the highest acc value
     class_pair = highest_acc_pair[0]
@@ -206,7 +218,7 @@ else:
     M, test_example_idxs = get_train_and_test_examples_of_class_pair(class_pair)
     highest_acc_list = [highest_acc_pair[1]]
 
-    highest_acc_Q = find_next_class(class_pair, remaining_classes, M, test_example_idxs, highest_acc_list, high=True)
+    highest_acc_Q = find_next_class(class_pair, remaining_classes, M, test_example_idxs, highest_acc_list, k_kNN, high=True)
 
 # Find the lowest acc sequence
 class_pair = lowest_acc_pair[0]
@@ -214,9 +226,10 @@ remaining_classes = list(set(available_classes) - set(class_pair))
 M, test_example_idxs = get_train_and_test_examples_of_class_pair(class_pair)
 lowest_acc_list = [lowest_acc_pair[1]]
 
-lowest_acc_Q = find_next_class(class_pair, remaining_classes, M, test_example_idxs, lowest_acc_list, high=False)
+lowest_acc_Q = find_next_class(class_pair, remaining_classes, M, test_example_idxs, lowest_acc_list, k_kNN, high=False)
 
 print('Highest accuracy sequence:', highest_acc_Q, ', acc values:', ['{:0.5f}'.format(acc) for acc in highest_acc_list])
 print('Lowest accuracy sequence:', lowest_acc_Q, ', acc values:', ['{:0.5f}'.format(acc) for acc in lowest_acc_list])
 print('Saving sequence to file...')
 np.save(config['artifacts_dir_path'] + dataset_name + '_class_sequences.npy', np.array([highest_acc_Q, lowest_acc_Q]))
+np.save(config['artifacts_dir_path'] + dataset_name + '_test_acc.npy', np.array([highest_acc_list, lowest_acc_list]))
