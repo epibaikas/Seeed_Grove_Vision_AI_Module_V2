@@ -126,6 +126,8 @@ if __name__ == '__main__':
     else:
         raise argparse.ArgumentTypeError('Invalid subset selection function')
 
+    # Load k_kNN value
+    config['k_kNN'] = int(np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_k_kNN.npy')))
 
     # Class sequence
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
