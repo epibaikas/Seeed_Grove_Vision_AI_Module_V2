@@ -35,7 +35,7 @@ def load_dataset(dataset_name, root_dir, device):
 
     return train_set, test_set, X_train, y_train, X_test, y_test
 
-def ACC(classifier, X_test, y_test, subset_idxs, test_subset_idxs=[], k_kNN=1):
+def ACC(classifier, X_test, y_test, subset_idxs, test_subset_idxs=[], k_kNN=3):
     y_pred = classifier.predict(X_test, subset_idxs, train_classifier=False, k=k_kNN)
 
     if len(test_subset_idxs) == 0:
