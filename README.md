@@ -68,7 +68,7 @@ sh flash.sh
 ```
 
 ## Reproduce experiments
-Switch to `EPII_CM55M_APP_S/app/scenario_app/incr_learn/, if not there already:
+Switch to `EPII_CM55M_APP_S/app/scenario_app/incr_learn/`, if not there already:
 ```
 cd EPII_CM55M_APP_S/app/scenario_app/incr_learn/ 
 ```
@@ -87,5 +87,11 @@ python py_src/greedy_sequence_finder.py EMNIST
 python scripts/run_sub_selection [dataset] [sub_sel_func] [bal] [ram_buf_size] [eeprom_buf_size]
 ```
 
-To run on the Seeed board instead of host platform, add the `--target_dev` flag at the end. 
+For example, to run greedy balanced subset selection on FashionMNIST with a 32 kB RAM buffer size and a 64 kB EEPROM buffer size, use the following arguments:
+```
+python scripts/run_sub_selection FashionMNIST greedy 1 32 64
+```
+
+
+To run on the Seeed board instead of the host platform, add the `--target_dev` flag at the end. 
 Ensure that the device is connected to the system and update its serial port in `config/config_global.ini`
