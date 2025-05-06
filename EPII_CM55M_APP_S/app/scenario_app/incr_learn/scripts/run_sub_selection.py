@@ -25,6 +25,7 @@ if __name__ == '__main__':
                         help='The size of RAM buffer given in KBs')
     parser.add_argument('eeprom_buf_size', type=positive_int,
                         help='The size of the EEPROM buffer given in KBs')
+    parser.add_argument('--hyperparam', type=str, help='Use --hyperparam  to specify the name of hyperparameters artifact file')
     parser.add_argument('--target_dev', action='store_false', help='Use --target_dev flag when experiments will be run on the actual device')
 
     args = vars(parser.parse_args())
@@ -35,6 +36,7 @@ if __name__ == '__main__':
     bal = args['bal']
     ram_buf_size = args['ram_buf_size']
     eeprom_buf_size = args['eeprom_buf_size']
+    hyperparam = args['hyperparam']
     host = args['target_dev']
 
     print(f'host={host}')
@@ -65,8 +67,13 @@ if __name__ == '__main__':
 
         for trial in range(start_trial, num_of_trials + 1):
             for seq_type in seq_types:
-                scripts_with_args.append((py_file_path,  [dataset_name, sub_sel_func, str(bal), seq_type,
-                                                        str(ram_buf_size), str(eeprom_buf_size), str(trial)]))
+                if hyperparam is None:
+                    scripts_with_args.append((py_file_path, [dataset_name, sub_sel_func, str(bal), seq_type,
+                                                            str(ram_buf_size), str(eeprom_buf_size), str(trial)]))
+                else:
+                    scripts_with_args.append((py_file_path, [dataset_name, sub_sel_func, str(bal), seq_type,
+                                                            str(ram_buf_size), str(eeprom_buf_size), str(trial),
+                                                            '--hyperparam', hyperparam]))
 
         # Use ProcessPoolExecutor to limit concurrent execution
         with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -88,8 +95,12 @@ if __name__ == '__main__':
 
         for trial in range(start_trial, num_of_trials + 1):
             for seq_type in seq_types:
-                args = [dataset_name, sub_sel_func, str(bal), seq_type, str(ram_buf_size),
+                if hyperparam is None:
+                    args = [dataset_name, sub_sel_func, str(bal), seq_type, str(ram_buf_size),
                         str(eeprom_buf_size), str(trial), '--target_dev']
+                else:
+                    args = [dataset_name, sub_sel_func, str(bal), seq_type, str(ram_buf_size),
+                        str(eeprom_buf_size), str(trial), '--hyperparam', hyperparam, '--target_dev']
                 
                 process = subprocess.Popen(["python", py_file_path] + args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, text=True, bufsize=1)
 

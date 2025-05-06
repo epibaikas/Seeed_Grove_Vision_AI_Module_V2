@@ -31,6 +31,7 @@ if __name__ == '__main__':
                         help='The size of the EEPROM buffer given in KBs')
     parser.add_argument('trial', type=positive_int,
                         help='The experiment trial number used to adjust random seed for random sampling functions')
+    parser.add_argument('--hyperparam', type=str, help='Use --hyperparam  to specify the name of hyperparameters artifact file')
     parser.add_argument('--target_dev', action='store_false', help='Use --target_dev flag when experiment will be run on the actual device')
 
     args = vars(parser.parse_args())
@@ -43,6 +44,7 @@ if __name__ == '__main__':
     ram_buf_size = args['ram_buf_size']
     eeprom_buf_size = args['eeprom_buf_size']
     trial = args['trial']
+    hyperparam = args['hyperparam']
     target_dev = args['target_dev']
 
     # Check that the balancing argument is valid:
@@ -110,19 +112,46 @@ if __name__ == '__main__':
 
     exp_param = (f'{dataset_name}_{sub_sel_func}{bal_str}_emulation={str(config["host"]).lower()}_seq={seq_type}_ram_buf_size={ram_buf_size}_eeprom_buf_size='
                  f'{eeprom_buf_size}_')
+
+    file_index_line = (f",{str(config['host']).lower()},{dataset_name},{sub_sel_func},{bal},"
+                           f"{seq_type},{ram_buf_size},{eeprom_buf_size},{trial}")
+    header = ('filename_prefix,emulation,dataset_name,sub_sel_func,bal,seq,ram_buf_size,eeprom_buf_size,trial,'
+              'num_iter,num_gen,mutation_rate,population_size,num_parents,hyperparam_file')
+
+    hyperparam_list = []
+    if hyperparam is not None:
+        with open(os.path.join(config['artifacts_dir_path'], hyperparam), 'rb') as f:
+                hyperparam_list = pickle.load(f)
+
+    sel_func_param = [bal, 200]
     if sub_sel_func == 'rand':
-        filename_prefix = exp_param + f'trial={trial}_'
         sel_func = rand_subset_selection
-        sel_func_param = [bal, 200]
+        filename_prefix = exp_param + f'trial={trial}_'
+        file_index_line = filename_prefix + file_index_line + ',,,,,,'
+
     elif sub_sel_func == 'greedy':
-        filename_prefix = exp_param + f'num_iter={config["num_iter"]}_trial={trial}_'
         sel_func = greedy_subset_selection
-        sel_func_param = [bal, 200, config['num_iter'], config['mutation_rate']]
+        assert len(hyperparam_list) == 2
+        config['num_iter'] = hyperparam_list[0]
+        config['mutation_rate'] = hyperparam_list[1]
+        filename_prefix = exp_param + f"num_iter={config['num_iter']}_mut={config['mutation_rate']}_" + f'trial={trial}_'
+        file_index_line = filename_prefix + file_index_line + f",{config['num_iter']},,{config['mutation_rate']},,{hyperparam}"
+        sel_func_param += [config['num_iter'], config['mutation_rate']]
+
     elif sub_sel_func == 'evo':
-        filename_prefix = exp_param + f'num_gen={config["num_gen"]}_trial={trial}_'
         sel_func = evo_subset_selection
-        sel_func_param = [bal, 200, config['num_gen'], config['population_size'], config['num_parents'],
-                          config['mutation_rate']]
+        assert len(hyperparam_list) == 4
+        config['num_gen'] = hyperparam_list[0]
+        config['population_size'] = hyperparam_list[1]
+        config['num_parents'] = hyperparam_list[2]
+        config['mutation_rate'] = hyperparam_list[3]
+
+        filename_prefix = (exp_param + (f"num_gen={config['num_gen']}_mut={config['mutation_rate']}_"
+                            f"pop_size={config['population_size']}_num_par={config['num_parents']}_") +
+                            f'trial={trial}_')
+        file_index_line = filename_prefix + file_index_line + f",,{config['num_gen']},{config['mutation_rate']},{config['population_size']},{config['num_parents']},{hyperparam}"
+        sel_func_param += [config['num_gen'], config['population_size'], config['num_parents'], config['mutation_rate']]
+
     else:
         raise argparse.ArgumentTypeError('Invalid subset selection function')
 
@@ -337,6 +366,15 @@ if __name__ == '__main__':
 
     # Write xml logs to file
     write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
+
+    # Check if file_index.csv exists
+    file_index_path = os.path.join(config['log_dir_path'], 'file_index.csv')
+    if not os.path.exists(file_index_path):
+        with open(file_index_path, 'a') as f:
+            f.write(header + '\n')
+
+    with open(file_index_path, 'a') as f:
+        f.write(file_index_line + '\n')
 
     # Kill the spawned process emulating the device
     if config['host']:
