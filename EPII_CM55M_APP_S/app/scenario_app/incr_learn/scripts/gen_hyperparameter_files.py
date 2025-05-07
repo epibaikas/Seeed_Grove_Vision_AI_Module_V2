@@ -15,7 +15,7 @@ if __name__ == '__main__':
     sub_sel_funcs = ['greedy', 'evo']
 
     mutation_rate_list = [0.01, 0.05, 0.10, 0.20]
-    population_size_list = [20, 40, 60, 80]
+    population_size_list = [40, 60, 80, 100]
     num_of_parents_list = [10, 20, 30]
 
     param_combinations = [list(combination) for combination in product(population_size_list, num_of_parents_list, mutation_rate_list)]

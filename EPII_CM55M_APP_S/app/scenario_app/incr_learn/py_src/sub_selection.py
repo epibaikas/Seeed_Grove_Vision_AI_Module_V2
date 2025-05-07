@@ -135,7 +135,7 @@ if __name__ == '__main__':
         config['num_iter'] = hyperparam_list[0]
         config['mutation_rate'] = hyperparam_list[1]
         filename_prefix = exp_param + f"num_iter={config['num_iter']}_mut={config['mutation_rate']}_" + f'trial={trial}_'
-        file_index_line = filename_prefix + file_index_line + f",{config['num_iter']},,{config['mutation_rate']},,{hyperparam}"
+        file_index_line = filename_prefix + file_index_line + f",{config['num_iter']},,{config['mutation_rate']},,,{hyperparam}"
         sel_func_param += [config['num_iter'], config['mutation_rate']]
 
     elif sub_sel_func == 'evo':
