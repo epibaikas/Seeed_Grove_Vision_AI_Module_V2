@@ -21,11 +21,13 @@ if __name__ == '__main__':
     param_combinations = [list(combination) for combination in product(population_size_list, num_of_parents_list, mutation_rate_list)]
 
     for i, mutation_rate in enumerate(mutation_rate_list):
-        with open(os.path.join(config['artifacts_dir_path'], f'greedy_hyperparameters_{i+1:02}.pkl'), 'wb') as f:
+        with open(os.path.join(config['artifacts_dir_path'], f'greedy_hyper{i+1:02}.pkl'), 'wb') as f:
             hyperparameter_list = [config['num_iter'], mutation_rate]
             pickle.dump(hyperparameter_list, f)
+    print(f'Greedy hyperparam files: {i+1}')
 
     for i, param_combination in enumerate(param_combinations):
-        with open(os.path.join(config['artifacts_dir_path'], f'evo_hyperparameters_{i+1:02}.pkl'), 'wb') as f:
+        with open(os.path.join(config['artifacts_dir_path'], f'evo_hyper{i+1:02}.pkl'), 'wb') as f:
             hyperparameter_list = [config['num_gen']] + param_combination
             pickle.dump(hyperparameter_list, f)
+    print(f'Evo hyperparam files: {i+1}')
