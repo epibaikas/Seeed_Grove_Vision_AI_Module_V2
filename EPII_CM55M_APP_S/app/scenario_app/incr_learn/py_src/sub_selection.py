@@ -5,6 +5,7 @@ import math
 from tqdm import tqdm
 import pickle
 import subprocess
+import pandas as pd
 
 from protocol_functions import *
 from argparse_utils import *
@@ -31,7 +32,7 @@ if __name__ == '__main__':
                         help='The size of the EEPROM buffer given in KBs')
     parser.add_argument('trial', type=positive_int,
                         help='The experiment trial number used to adjust random seed for random sampling functions')
-    parser.add_argument('--hyperparam', type=str, help='Use --hyperparam  to specify the name of hyperparameters artifact file')
+    parser.add_argument('--hyperparam', type=str, help='Use --hyperparam  to specify the name of the hyperparameter set')
     parser.add_argument('--target_dev', action='store_false', help='Use --target_dev flag when experiment will be run on the actual device')
 
     args = vars(parser.parse_args())
@@ -116,12 +117,13 @@ if __name__ == '__main__':
     file_index_line = (f",{str(config['host']).lower()},{dataset_name},{sub_sel_func},{bal},"
                            f"{seq_type},{ram_buf_size},{eeprom_buf_size},{trial}")
     header = ('filename_prefix,emulation,dataset_name,sub_sel_func,bal,seq,ram_buf_size,eeprom_buf_size,trial,'
-              'num_iter,num_gen,mutation_rate,population_size,num_parents,hyperparam_file')
+              'num_iter,num_gen,mutation_rate,population_size,num_parents,hyperparam_set')
 
-    hyperparam_list = []
     if hyperparam is not None:
-        with open(os.path.join(config['artifacts_dir_path'], hyperparam), 'rb') as f:
-                hyperparam_list = pickle.load(f)
+        hyperparam_index_pd = pd.read_csv(os.path.join(config['artifacts_dir_path'],
+                                                       config['hyperparam_index_file_name']))
+        hyperparam_pd = hyperparam_index_pd[hyperparam_index_pd['hyperparam_set'] == hyperparam]
+        assert not hyperparam_pd.empty
 
     sel_func_param = [bal, 200]
     if sub_sel_func == 'rand':
@@ -131,25 +133,25 @@ if __name__ == '__main__':
 
     elif sub_sel_func == 'greedy':
         sel_func = greedy_subset_selection
-        assert len(hyperparam_list) == 2
-        config['num_iter'] = hyperparam_list[0]
-        config['mutation_rate'] = hyperparam_list[1]
-        filename_prefix = exp_param + f"num_iter={config['num_iter']}_mut={config['mutation_rate']}_" + f'trial={trial}_'
-        file_index_line = filename_prefix + file_index_line + f",{config['num_iter']},,{config['mutation_rate']},,,{hyperparam}"
+        assert hyperparam_pd['sub_sel_func'].iloc[0] == 'greedy'
+        config['num_iter'] = hyperparam_pd['num_iter'].iloc[0]
+        config['mutation_rate'] = hyperparam_pd['mutation_rate'].iloc[0]
+        filename_prefix = exp_param + f"num_iter={config['num_iter']}_mut={config['mutation_rate']:.2f}_" + f'trial={trial}_'
+        file_index_line = filename_prefix + file_index_line + f",{config['num_iter']},,{config['mutation_rate']:.2f},,,{hyperparam}"
         sel_func_param += [config['num_iter'], config['mutation_rate']]
 
     elif sub_sel_func == 'evo':
         sel_func = evo_subset_selection
-        assert len(hyperparam_list) == 4
-        config['num_gen'] = hyperparam_list[0]
-        config['population_size'] = hyperparam_list[1]
-        config['num_parents'] = hyperparam_list[2]
-        config['mutation_rate'] = hyperparam_list[3]
+        assert hyperparam_pd['sub_sel_func'].iloc[0] == 'evo'
+        config['num_gen'] = hyperparam_pd['num_gen'].iloc[0]
+        config['population_size'] = hyperparam_pd['population_size'].iloc[0]
+        config['num_parents'] = hyperparam_pd['num_parents'].iloc[0]
+        config['mutation_rate'] = hyperparam_pd['mutation_rate'].iloc[0]
 
-        filename_prefix = (exp_param + (f"num_gen={config['num_gen']}_mut={config['mutation_rate']}_"
+        filename_prefix = (exp_param + (f"num_gen={config['num_gen']}_mut={config['mutation_rate']:.2f}_"
                             f"pop_size={config['population_size']}_num_par={config['num_parents']}_") +
                             f'trial={trial}_')
-        file_index_line = filename_prefix + file_index_line + f",,{config['num_gen']},{config['mutation_rate']},{config['population_size']},{config['num_parents']},{hyperparam}"
+        file_index_line = filename_prefix + file_index_line + f",,{config['num_gen']},{config['mutation_rate']:.2f},{config['population_size']},{config['num_parents']},{hyperparam}"
         sel_func_param += [config['num_gen'], config['population_size'], config['num_parents'], config['mutation_rate']]
 
     else:
@@ -368,7 +370,7 @@ if __name__ == '__main__':
     write_xml_files(req_log_xml_file_path, resp_log_xml_file_path, req_log_xml_root, resp_log_xml_root)
 
     # Check if file_index.csv exists
-    file_index_path = os.path.join(config['log_dir_path'], 'file_index.csv')
+    file_index_path = os.path.join(config['log_dir_path'], config['file_index'])
     if not os.path.exists(file_index_path):
         with open(file_index_path, 'a') as f:
             f.write(header + '\n')
