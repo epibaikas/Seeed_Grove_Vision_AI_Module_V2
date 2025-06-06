@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.ticker as ticker
@@ -35,7 +36,7 @@ def set_size(width, fraction=1, subplots=(1, 1)):
 
     # Golden ratio to set aesthetic figure height
     # https://disq.us/p/2940ij3
-    golden_ratio = (5**.5 - 1) / 2
+    golden_ratio = (5 ** .5 - 1) / 2
 
     # Figure width in inches
     fig_width_in = fig_width_pt * inches_per_pt
@@ -78,7 +79,7 @@ def get_sub_sel_time(root, sub_sel_func):
         data_out_str = data_out_str.replace('uint8', 'np.uint8')
 
         data_out = eval(data_out_str)
-        sub_sel_time = float(data_out[3][0]) * 1e-6 # Convert microseconds to seconds
+        sub_sel_time = float(data_out[3][0]) * 1e-6  # Convert microseconds to seconds
         sub_sel_time_list.append(sub_sel_time)
 
     return sub_sel_time_list
@@ -120,26 +121,33 @@ def extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, se
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
     class_seq_len = class_sequences.shape[1]
 
+    df = pd.read_csv(os.path.join(config['log_dir_path'], config['file_index']))
     data = np.zeros((len(eval_metrics), len(buffer_sizes), len(seq_types), len(sub_sel_funcs), 2, class_seq_len - 1))
 
     for col, seq_type in enumerate(seq_types):
         for row, eval_metric in enumerate(eval_metrics):
             for func_num, func in enumerate(sub_sel_funcs):
+                try:
+                    with open(os.path.join(config['artifacts_dir_path'], f"{dataset_name}_{func}_hyper.txt"), 'r') as f:
+                        hyperparam_set = f.readline()
+                        condition = df['hyperparam_set'] == hyperparam_set
+                except:
+                    condition = df['hyperparam_set'].isna()
+
+                bal = 1 if '_bal' in func else 0
+
                 for buffer_size_pair_num, (ram_buffer_size, eeprom_buffer_size) in enumerate(buffer_sizes):
                     metric = np.zeros((num_of_trials, class_seq_len - 1), dtype=float)
 
-                    for trial in range(num_of_trials):
+                    filtered_df = df[(df['dataset_name'] == dataset_name) & (df['emulation'] == config['host']) &
+                                     (df['sub_sel_func'] == func.strip('_bal')) &
+                                     (df['bal'] == bal) & (df['seq'] == seq_type) &
+                                     (df['ram_buf_size'] == ram_buffer_size) &
+                                     (df['eeprom_buf_size'] == eeprom_buffer_size) &
+                                     (condition)]
 
-                        exp_param = f'sub_selection_emulation={str(config["host"]).lower()}_seq={seq_type}_ram_buf_size={ram_buffer_size}_eeprom_buf_size={eeprom_buffer_size}_'
-                        if func == 'rand_bal':
-                            filename_prefix = f'{dataset_name}_{func}_' + exp_param + f'trial={trial + 1}_'
-                        elif func[0] == 'rand_greedy':
-                            num_iter = func[1]
-                            filename_prefix = f'{dataset_name}_{func[0]}_' + exp_param + f'num_iter={num_iter}_trial={trial + 1}_'
-                        elif func[0] == 'evo':
-                            num_gen = func[1]
-                            filename_prefix = f'{dataset_name}_{func[0]}_' + exp_param + f'num_gen={num_gen}_trial={trial + 1}_'
-
+                    assert len(filtered_df['filename_prefix'].tolist()) == num_of_trials
+                    for trial, filename_prefix in enumerate(filtered_df['filename_prefix'].tolist()):
                         with open(os.path.join(config['results_dir_path'], filename_prefix + 'results_dict.pkl'),
                                   'rb') as f:
                             results_dict = pickle.load(f)
@@ -160,37 +168,43 @@ def extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, se
 def extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials):
     datetime_formats = ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S']
 
+    df = pd.read_csv(os.path.join(config['log_dir_path'], config['file_index']))
     time_measurements = np.zeros((len(buffer_sizes), len(sub_sel_funcs), 2))
+
+    list_of_sub_sel_func_time_lists = []
 
     for buffer_size_num, [ram_buffer_size, eeprom_buffer_size] in enumerate(buffer_sizes):
         compute_dist_time_list = []
 
-        sub_sel_func_time_list = [[], [], []]
+        sub_sel_func_time_list = [[] for _ in range(0, len(sub_sel_funcs))]
         sub_sel_func_time_median = np.zeros(len(sub_sel_funcs))
         sub_sel_func_time_iqr = np.zeros(len(sub_sel_funcs))
 
         for i, func in enumerate(sub_sel_funcs):
-            for j in range(num_of_trials):
-                for k, seq_type in enumerate(seq_types):
-                    exp_param = f'sub_selection_emulation={str(config["host"]).lower()}_seq={seq_type}_ram_buf_size={ram_buffer_size}_eeprom_buf_size={eeprom_buffer_size}_'
-                    if func == 'rand_bal':
-                        filename_prefix = f'{dataset_name}_{func}_' + exp_param + f'trial={j + 1}_'
-                    elif func[0] == 'rand_greedy':
-                        num_iter = func[1]
-                        filename_prefix = f'{dataset_name}_{func[0]}_' + exp_param + f'num_iter={num_iter}_trial={j + 1}_'
-                    elif func[0] == 'evo':
-                        num_gen = func[1]
-                        filename_prefix = f'{dataset_name}_{func[0]}_' + exp_param + f'num_gen={num_gen}_trial={j + 1}_'
+            for seq_type in seq_types:
+                try:
+                    with open(os.path.join(config['artifacts_dir_path'], f"{dataset_name}_{func}_hyper.txt"), 'r') as f:
+                        hyperparam_set = f.readline()
+                        condition = df['hyperparam_set'] == hyperparam_set
+                except:
+                    condition = df['hyperparam_set'].isna()
 
+                bal = 1 if '_bal' in func else 0
+                filtered_df = df[(df['dataset_name'] == dataset_name) & (df['emulation'] == config['host']) &
+                                 (df['sub_sel_func'] == func.strip('_bal')) &
+                                 (df['bal'] == bal) & (df['seq'] == seq_type) &
+                                 (df['ram_buf_size'] == ram_buffer_size) &
+                                 (df['eeprom_buf_size'] == eeprom_buffer_size) &
+                                 (condition)]
+
+                assert len(filtered_df['filename_prefix'].tolist()) == num_of_trials
+
+                for filename_prefix in filtered_df['filename_prefix'].tolist():
                     tree = ET.parse(os.path.join(config['log_dir_path'], 'xml', filename_prefix + 'responses_log.xml'))
                     root = tree.getroot()
 
                     compute_dist_time_list += get_resp_elapsed_time(root, 'compute_dist_matrix', datetime_formats)
-
-                    if func == 'rand_bal':
-                        sub_sel_func_time_list[i] += get_sub_sel_time(root, 'rand_subset_selection')
-                    elif func[0] == 'rand_greedy' or func[0] == 'evo':
-                        sub_sel_func_time_list[i] += get_sub_sel_time(root, func[0] + '_subset_selection')
+                    sub_sel_func_time_list[i] += get_sub_sel_time(root, func.strip('_bal') + '_subset_selection')
 
             sub_sel_func_time_median[i] = np.median(np.array(sub_sel_func_time_list[i]))
             q1 = np.percentile(np.array(sub_sel_func_time_list[i]), 25)
@@ -200,22 +214,27 @@ def extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, bu
             time_measurements[buffer_size_num, i, 0] = sub_sel_func_time_median[i]
             time_measurements[buffer_size_num, i, 1] = sub_sel_func_time_iqr[i]
 
-    return time_measurements
+        list_of_sub_sel_func_time_lists.append(sub_sel_func_time_list)
+
+    return time_measurements, list_of_sub_sel_func_time_lists
 
 
-def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=False):
+def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth,
+                             color_dict, save_fig=False):
     eval_metrics = ['acc_test_set_union', 'acc_train_set_union']
     dataset_names_str = ''
 
-    width_in, _ = set_size(width=textwidth, subplots=(len(eval_metrics), len(seq_types)*len(dataset_names)))
+    width_in, _ = set_size(width=textwidth, subplots=(len(eval_metrics), len(seq_types) * len(dataset_names)))
 
-    fig, ax = plt.subplots(nrows=len(eval_metrics), ncols=len(seq_types)*len(dataset_names), figsize=(width_in, 2*2.0))
+    fig, ax = plt.subplots(nrows=len(eval_metrics), ncols=len(seq_types) * len(dataset_names),
+                           figsize=(width_in, 2 * 2.0))
 
     for i, dataset_name in enumerate(dataset_names):
         class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
         class_seq_len = class_sequences.shape[1]
 
-        data = extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+        data = extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, seq_types, buffer_sizes,
+                                      num_of_trials)
 
         for col, seq_type in enumerate(seq_types):
             for row, eval_metric in enumerate(eval_metrics):
@@ -229,55 +248,58 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
                             linestyle = '-'
                             hatch = '/'
                             label = f'({ram_buffer_size}, {eeprom_buffer_size})'
-                        elif func[0] == 'rand_greedy':
+                        elif func == 'greedy_bal':
                             linestyle = '--'
                             hatch = '//'
                             label = None
-                        elif func[0] == 'evo':
+                        elif func == 'evo_bal':
                             linestyle = ':'
                             hatch = 'x'
                             label = None
 
                         t = np.arange(2, class_seq_len + 1)
-                        ax[row, 2*i+col].plot(t, metric_mean, linestyle=linestyle, label=label, color=color_dict[(ram_buffer_size, eeprom_buffer_size)], lw=0.8)
-                        ax[row, 2*i+col].fill_between(t, metric_mean - metric_std, metric_mean + metric_std,
-                                                  color=color_dict[(ram_buffer_size, eeprom_buffer_size)], alpha=0.08, linestyle=linestyle, edgecolor='black', lw=0.8)
+                        ax[row, 2 * i + col].plot(t, metric_mean, linestyle=linestyle, label=label,
+                                                  color=color_dict[(ram_buffer_size, eeprom_buffer_size)], lw=0.8)
+                        ax[row, 2 * i + col].fill_between(t, metric_mean - metric_std, metric_mean + metric_std,
+                                                          color=color_dict[(ram_buffer_size, eeprom_buffer_size)],
+                                                          alpha=0.08, linestyle=linestyle, edgecolor='black', lw=0.8)
 
-                        ax[row, 2*i+col].xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
-                        ax[row, 2*i+col].grid(True, which='minor', alpha=0.3)
-                        ax[row, 2*i+col].grid(True, which='major')
+                        ax[row, 2 * i + col].xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+                        ax[row, 2 * i + col].grid(True, which='minor', alpha=0.3)
+                        ax[row, 2 * i + col].grid(True, which='major')
 
                         if eval_metric == 'acc_test_set_union':
                             if dataset_name == 'FashionMNIST' or dataset_name == 'MNIST':
-                                ax[row, 2*i+col].set_ylim([0.55, 1.0])
+                                ax[row, 2 * i + col].set_ylim([0.55, 1.0])
                             else:
-                                ax[row, 2*i+col].set_ylim([0.3, 1.0])
+                                ax[row, 2 * i + col].set_ylim([0.3, 1.0])
                         elif eval_metric == 'acc_train_set_union':
                             if dataset_name == 'FashionMNIST' or dataset_name == 'MNIST':
-                                ax[row, 2*i+col].set_ylim([0.55, 1.0])
+                                ax[row, 2 * i + col].set_ylim([0.55, 1.0])
                             else:
-                                ax[row, 2*i+col].set_ylim([0.3, 1.0])
+                                ax[row, 2 * i + col].set_ylim([0.3, 1.0])
                         elif eval_metric == 'acc_global':
-                            ax[row, 2*i+col].set_ylim([0, 1.0])
+                            ax[row, 2 * i + col].set_ylim([0, 1.0])
 
                         if row == 0:
                             if seq_type == 'low':
-                                ax[row, 2*i+col].set_title('$\mathbf{q}_{\min}$')
+                                ax[row, 2 * i + col].set_title('$\mathbf{q}_{\min}$')
                             elif seq_type == 'high':
-                                ax[row, 2*i+col].set_title('$\mathbf{q}_{\max}$')
+                                ax[row, 2 * i + col].set_title('$\mathbf{q}_{\max}$')
 
                         if col == 0 and i > 0:
-                            ax[row, 2*i+col].set_yticklabels([])
+                            ax[row, 2 * i + col].set_yticklabels([])
                         if col > 0:
-                            ax[row, 2*i+col].set_yticklabels([])
+                            ax[row, 2 * i + col].set_yticklabels([])
 
                         if not row == len(eval_metrics) - 1:
-                            ax[row, 2*i+col].set_xticklabels([])
+                            ax[row, 2 * i + col].set_xticklabels([])
 
                         if dataset_name == 'EMNIST':
                             ax[row, 2 * i + col].set_xticks([2, 14, 26, 38, 47])
                         else:
-                            ax[row, 2*i+col].set_xticks([i for i in range(2, class_seq_len+1, int(class_seq_len / 5))])
+                            ax[row, 2 * i + col].set_xticks(
+                                [i for i in range(2, class_seq_len + 1, int(class_seq_len / 5))])
 
         if dataset_name == 'MNIST' or dataset_name == 'EMNIST':
             for j, eval_metric in enumerate(eval_metrics):
@@ -286,8 +308,8 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
                 elif eval_metric == 'acc_train_set_union':
                     ax[j, 0].set_ylabel('$A_{1}$ on train set $\{\mathcal{B}_{t}\}_{i=1}^{t}$')
 
-        ax[1, 2*i].set_xlabel('Num of classes')
-        ax[1, 2*i+1].set_xlabel('Num of classes')
+        ax[1, 2 * i].set_xlabel('Num of classes')
+        ax[1, 2 * i + 1].set_xlabel('Num of classes')
 
         dataset_names_str += dataset_name + '_'
     # handles, labels = plt.gca().get_legend_handles_labels()
@@ -311,78 +333,42 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
         lines = [ax[0, 0].plot([], [], color=color)[0] for color in colors]
 
         ax[0, 0].legend(lines, buffer_sizes, title='Volatile and non-volatile mem.\nbuffer sizes (kB):',
-                   loc='upper center', ncol=2, fancybox=False, shadow=False)
+                        loc='upper center', ncol=2, fancybox=False, shadow=False)
 
         # ax[0, 0].legend(title='Volatile and non-volatile mem.\nbuffer sizes (kB):', handles=handles, labels=labels,
         #            loc='upper center', ncol=2, fancybox=False, shadow=False)
 
     if save_fig:
         plt.tight_layout()
-        plt.savefig(os.path.join(config['plots_dir_path'], f'{dataset_names_str}class_incr_learn_emulation={config["host"]}.pdf'), bbox_inches='tight', pad_inches=0.0)
+        plt.savefig(os.path.join(config['plots_dir_path'],
+                                 f'{dataset_names_str}class_incr_learn_emulation={str(config["host"]).lower()}.pdf'),
+                    bbox_inches='tight', pad_inches=0.0)
     else:
         plt.show()
 
 
-def plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=False):
-    datetime_formats = ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S']
+def plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth,
+                             color_dict, save_fig=False):
 
     width_in, height_in = set_size(width=textwidth)
     fig, ax = plt.subplots(figsize=(width_in, height_in))
 
-    # x_labels = [r"\texttt{compute_dist()}"] + [rf"\texttt{{{func}()}}" if type(func) is str else rf"\texttt{{{func[0]}()}}" + f"\n($N_{{iter}}$={func[1]})" for func in sub_sel_funcs]
-    x_labels = [rf"\texttt{{{func}()}}" if type(func) is str else rf"\texttt{{{func[0]}()}}" + f"\n($N_{{iter}}$={func[1]})" for func in sub_sel_funcs]
+    x_labels = [
+        rf"\texttt{{{func}()}}" if type(func) is str else rf"\texttt{{{func[0]}()}}" + f"\n($N_{{iter}}$={func[1]})" for
+        func in sub_sel_funcs]
     x = np.arange(len(x_labels))
-    width = 0.15 # the width of the bars
+    width = 0.15  # the width of the bars
 
+    _, list_of_sub_sel_func_time_lists = extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types,
+                                                                   buffer_sizes, num_of_trials)
 
     for color_idx, [ram_buffer_size, eeprom_buffer_size] in enumerate(buffer_sizes):
         label = f'({ram_buffer_size}, {eeprom_buffer_size})'
 
-        compute_dist_time_list = []
-
-        sub_sel_func_time_list = [[] for _ in range(0, len(sub_sel_funcs))]
-        sub_sel_func_time_median = np.zeros(len(sub_sel_funcs))
-        sub_sel_func_time_iqr = np.zeros(len(sub_sel_funcs))
-
-        for i, func in enumerate(sub_sel_funcs):
-            for j in range(num_of_trials):
-                for k, seq_type in enumerate(seq_types):
-                    # filename_prefix = f'{dataset_name}_{func}_sub_selection_seq={seq_type}_trial={j+1}_'
-                    exp_param = f'sub_selection_emulation={str(config["host"]).lower()}_seq={seq_type}_ram_buf_size={ram_buffer_size}_eeprom_buf_size={eeprom_buffer_size}_'
-                    if func == 'rand_bal':
-                        filename_prefix = f'{dataset_name}_{func}_' + exp_param + f'trial={j + 1}_'
-                    elif func[0] == 'rand_greedy':
-                        num_iter = func[1]
-                        filename_prefix = f'{dataset_name}_{func[0]}_' + exp_param + f'num_iter={num_iter}_trial={j + 1}_'
-                    elif func[0] == 'evo':
-                        num_gen = func[1]
-                        filename_prefix = f'{dataset_name}_{func[0]}_' + exp_param + f'num_gen={num_gen}_trial={j + 1}_'
-
-                    tree = ET.parse(os.path.join(config['log_dir_path'], 'xml', filename_prefix + 'responses_log.xml'))
-                    root = tree.getroot()
-
-                    compute_dist_time_list += get_resp_elapsed_time(root, 'compute_dist_matrix', datetime_formats)
-
-                    if func == 'rand_bal':
-                        sub_sel_func_time_list[i] += get_sub_sel_time(root, 'rand_subset_selection')
-
-                    elif func[0] == 'rand_greedy' or func[0] == 'evo':
-                        sub_sel_func_time_list[i] += get_sub_sel_time(root, func[0] + '_subset_selection')
-
-            sub_sel_func_time_median[i] = np.median(np.array(sub_sel_func_time_list[i]))
-            q1 = np.percentile(np.array(sub_sel_func_time_list[i]), 25)
-            q3 = np.percentile(np.array(sub_sel_func_time_list[i]), 75)
-            sub_sel_func_time_iqr[i] = q3 - q1
-
-        # compute_dist_time_mean = np.mean(np.array(compute_dist_time_list))
-        # compute_dist_time_std = np.std(np.array(compute_dist_time_list))
-
-        # height = [compute_dist_time_mean] + list(sub_sel_func_time_mean)
-        # yerr = [compute_dist_time_std] + list(sub_sel_func_time_std)
-
-        x_box_plot = sub_sel_func_time_list
-        positions = x + (color_idx * width - (len(buffer_sizes) - 1) * width/2)
-        box = ax.boxplot(x=x_box_plot, positions=positions, showmeans=True, showfliers=True, widths=width*0.9, label=label)
+        x_box_plot = list_of_sub_sel_func_time_lists[color_idx]
+        positions = x + (color_idx * width - (len(buffer_sizes) - 1) * width / 2)
+        box = ax.boxplot(x=x_box_plot, positions=positions, showmeans=True, showfliers=True, widths=width * 0.9,
+                         label=label)
 
         for median_num, median in enumerate(box['medians']):
             median.set_color(color_dict[(ram_buffer_size, eeprom_buffer_size)])  # Change to any color you like
@@ -399,7 +385,7 @@ def plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buf
 
     if save_fig:
         plt.tight_layout()
-        plt.savefig(os.path.join(config['plots_dir_path'], f'{dataset_name}_func_time_emulation={config["host"]}.pdf'))
+        plt.savefig(os.path.join(config['plots_dir_path'], f'{dataset_name}_func_time_emulation={str(config["host"]).lower()}.pdf'))
     else:
         plt.show()
 
@@ -409,7 +395,8 @@ def class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_
 
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
     class_seq_len = class_sequences.shape[1]
-    data = extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    data = extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, seq_types, buffer_sizes,
+                                  num_of_trials)
 
     offset = 2
     if dataset_name == 'EMNIST':
@@ -417,7 +404,7 @@ def class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_
         data_idxs = [i - offset for i in num_of_classes]
     else:
         num = 4
-        data_idxs = [math.ceil( (class_seq_len - offset) * i/num) for i in range(1, num+1)]
+        data_idxs = [math.ceil((class_seq_len - offset) * i / num) for i in range(1, num + 1)]
         num_of_classes = [i + offset for i in data_idxs]
 
     with open(os.path.join(config['plots_dir_path'], f'{dataset_name}_acc_table.txt'), 'w') as f:
@@ -476,13 +463,14 @@ def class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_
 
 
 def timing_measurements_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials):
-
-    hpc_time_measurements = extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    hpc_time_measurements, _ = extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes,
+                                                      num_of_trials)
 
     # Set 'host' flag false to get time measurements from target board
     config['host'] = False
     num_of_trials = 2
-    dev_time_measurements = extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes,  num_of_trials)
+    dev_time_measurements, _ = extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes,
+                                                      num_of_trials)
 
     # Reset flag to True
     config['host'] = True
@@ -502,12 +490,16 @@ def timing_measurements_table(config, dataset_name, sub_sel_funcs, seq_types, bu
                 print(f'{dev_type} & ', end='', file=f)
 
                 for func_num, _ in enumerate(sub_sel_funcs):
-
                     if dev_type == 'HPC':
-                        print(f"{hpc_time_measurements[buffer_size_pair_num, func_num, 0]:.2e} & & {hpc_time_measurements[buffer_size_pair_num, func_num, 1]:.2e} & ", end='', file=f)
+                        print(
+                            f"{hpc_time_measurements[buffer_size_pair_num, func_num, 0]:.2e} & & {hpc_time_measurements[buffer_size_pair_num, func_num, 1]:.2e} & ",
+                            end='', file=f)
                     else:
-                        multiplier = dev_time_measurements[buffer_size_pair_num, func_num, 0] / hpc_time_measurements[buffer_size_pair_num, func_num, 0]
-                        print(rf"{dev_time_measurements[buffer_size_pair_num, func_num, 0]:.2e} & \text{{$(\times\;${multiplier:1.1f})}} & {dev_time_measurements[buffer_size_pair_num, func_num, 1]:.2e} & ", end='', file=f)
+                        multiplier = dev_time_measurements[buffer_size_pair_num, func_num, 0] / hpc_time_measurements[
+                            buffer_size_pair_num, func_num, 0]
+                        print(
+                            rf"{dev_time_measurements[buffer_size_pair_num, func_num, 0]:.2e} & \text{{$(\times\;${multiplier:1.1f})}} & {dev_time_measurements[buffer_size_pair_num, func_num, 1]:.2e} & ",
+                            end='', file=f)
 
                 # Delete last two characters
                 f.seek(0, 2)  # Move to end of file
@@ -517,12 +509,14 @@ def timing_measurements_table(config, dataset_name, sub_sel_funcs, seq_types, bu
                 print('\cline{2-11}', file=f) if dev_num == 0 else print('\hline\hline', file=f)
 
 
-def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=False):
+def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials, textwidth,
+                               color_dict, save_fig=False):
     eval_metrics = ['acc_test_set_union', 'acc_train_set_union']
 
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
     class_seq_len = class_sequences.shape[1]
-    acc_data = extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    acc_data = extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, seq_types, buffer_sizes,
+                                      num_of_trials)
 
     offset = 2
     if dataset_name == 'EMNIST':
@@ -530,15 +524,16 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
         data_idxs = [i - offset for i in num_of_classes]
     else:
         num = 4
-        data_idxs = [math.ceil( (class_seq_len - offset) * i/num) for i in range(1, num+1)]
+        data_idxs = [math.ceil((class_seq_len - offset) * i / num) for i in range(1, num + 1)]
         num_of_classes = [i + offset for i in data_idxs]
 
-    time_measurements = extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    time_measurements, _ = extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes,
+                                                  num_of_trials)
 
     width_in, height_in = set_size(width=textwidth, subplots=(len(eval_metrics), len(num_of_classes)))
-    fig, ax = plt.subplots(nrows=len(eval_metrics), ncols=len(num_of_classes), figsize=(width_in, 4))
+    fig, ax = plt.subplots(nrows=len(eval_metrics), ncols=len(num_of_classes), figsize=(width_in, 3.8))
 
-    func_marker_dict = {'rand_bal': 'o', 'rand_greedy': '^', 'evo': 's'}
+    func_marker_dict = {'rand_bal': 'o', 'greedy_bal': '^', 'evo_bal': 's'}
 
     for eval_metric_num, eval_metric in enumerate(eval_metrics):
         for col, data_idx in enumerate(data_idxs):
@@ -577,14 +572,12 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
             ax[eval_metric_num, col].grid(True, which='minor', alpha=0.3)
             ax[eval_metric_num, col].grid(True, which='major')
 
-
             if dataset_name == 'MNIST':
                 ax[eval_metric_num, col].set_ylim([0.65, 1.0])
             elif dataset_name == 'FashionMNIST':
                 ax[eval_metric_num, col].set_ylim([0.5, 0.9])
             else:
                 ax[eval_metric_num, col].set_ylim([0.3, 1.0])
-
 
             if col > 0:
                 ax[eval_metric_num, col].set_yticklabels([])
@@ -611,17 +604,144 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
 
         # Dummy scatter plots
         func_names = [f"$\\texttt{{{func_name}()}}$" for func_name in list(func_marker_dict.keys())]
-        scatter = [ax[1, 1].scatter([], [], marker=func_marker_dict[func_name], s=10, color='black') for func_name in list(func_marker_dict.keys())]
+        scatter = [ax[1, 1].scatter([], [], marker=func_marker_dict[func_name], s=10, color='black') for func_name in
+                   list(func_marker_dict.keys())]
         ax[1, 1].legend(scatter, func_names, title='Sub. sel. funcs.', fontsize=6)
 
-        fig.suptitle(f'{dataset_name}')
+    fig.suptitle(f'{dataset_name}')
 
     if save_fig:
         plt.tight_layout()
-        plt.savefig(os.path.join(config['plots_dir_path'], f'{dataset_name}_pareto_front.pdf'), bbox_inches='tight', pad_inches=0.0)
+        plt.savefig(os.path.join(config['plots_dir_path'], f'{dataset_name}_pareto_front.pdf'), bbox_inches='tight',
+                    pad_inches=0.0)
     else:
         plt.show()
 
+
+def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq_types, num_of_trials,
+                              show_all_plots=False, save_fig=False):
+    class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
+    class_seq_len = class_sequences.shape[1]
+    ram_buffer_size, eeprom_buffer_size = 64, 128
+
+    df = pd.read_csv(os.path.join(config['log_dir_path'], config['file_index']))
+
+    fig, ax = plt.subplots(nrows=len(sub_sel_funcs) * len(bal_list), ncols=len(seq_types), figsize=(4.5, 11))
+
+    for col, seq_type in enumerate(seq_types):
+        for func_num, func in enumerate(sub_sel_funcs):
+            for bal in bal_list:
+
+                highest_metric_sum = 0
+                lowest_metric_sum = 1000
+                best_hyperparam = ['', '']
+                best_hyperparam_mean = np.zeros((class_seq_len - 1), dtype=float)
+                best_hyperparam_std = np.zeros((class_seq_len - 1), dtype=float)
+
+                worst_hyperparam = ['', '']
+                worst_hyperparam_mean = np.zeros((class_seq_len - 1), dtype=float)
+                worst_hyperparam_std = np.zeros((class_seq_len - 1), dtype=float)
+
+                hyper_index_df = pd.read_csv(
+                    os.path.join(config['artifacts_dir_path'], config['hyperparam_index_file_name']))
+                hyperparam_sets = hyper_index_df[(hyper_index_df['sub_sel_func'] == func)]['hyperparam_set'].to_list()
+
+                for hyperparam_set in hyperparam_sets:
+                    metric = np.zeros((num_of_trials, class_seq_len - 1), dtype=float)
+
+                    filtered_df = df[(df['dataset_name'] == dataset_name) & (df['emulation'] == config['host']) &
+                                     (df['sub_sel_func'] == func) & (df['bal'] == bal) & (df['seq'] == seq_type) &
+                                     (df['ram_buf_size'] == ram_buffer_size) &
+                                     (df['eeprom_buf_size'] == eeprom_buffer_size) &
+                                     (df['hyperparam_set'] == hyperparam_set)]
+
+                    for file_num, filename_prefix in enumerate(filtered_df['filename_prefix'].tolist()):
+                        with open(os.path.join(config['results_dir_path'], filename_prefix + 'results_dict.pkl'),
+                                  'rb') as f:
+                            results_dict = pickle.load(f)
+
+                        metric[file_num, :] = results_dict['acc_train_set_union']
+
+                    metric_mean = np.mean(metric, axis=0)
+                    metric_std = np.std(metric, axis=0)
+
+                    label = [int(filtered_df['num_iter'].tolist()[0])] if func == 'greedy' else [
+                        int(filtered_df['num_gen'].tolist()[0])]
+                    label += [filtered_df['mutation_rate'].tolist()[0]]
+                    legend_title = 'num_iter, ' if func == 'greedy' else 'num_gen, '
+                    legend_title += 'mut'
+                    if func == 'evo':
+                        label += [int(filtered_df['population_size'].tolist()[0])] + [
+                            int(filtered_df['num_parents'].tolist()[0])]
+                        legend_title += ', pop_size, num_parents'
+                    label_str = str(label)
+
+                    metric_sum = metric_mean.sum()
+                    if metric_sum > highest_metric_sum:
+                        highest_metric_sum = metric_sum
+                        best_hyperparam[0] = hyperparam_set
+                        best_hyperparam[1] = label
+                        best_hyperparam_mean = metric_mean
+                        best_hyperparam_std = metric_std
+
+                    if metric_sum < lowest_metric_sum:
+                        lowest_metric_sum = metric_sum
+                        worst_hyperparam[0] = hyperparam_set
+                        worst_hyperparam[1] = label
+                        worst_hyperparam_mean = metric_mean
+                        worst_hyperparam_std = metric_std
+
+                    if show_all_plots:
+                        t = np.arange(2, class_seq_len + 1)
+                        ax[2 * func_num + bal, col].plot(t, metric_mean, label=hyperparam_set, lw=0.6)
+                        ax[2 * func_num + bal, col].fill_between(t, metric_mean - metric_std, metric_mean + metric_std,
+                                                                 lw=0.6, alpha=0.08)
+
+                if seq_type == 'low':
+                    bal_str = '' if bal == 0 else '_bal'
+                    with open(os.path.join(config['artifacts_dir_path'], f'{dataset_name}_{func}{bal_str}_hyper.txt'),
+                              'w') as f:
+                        f.write(best_hyperparam[0])
+
+                if not show_all_plots:
+                    t = np.arange(2, class_seq_len + 1)
+                    ax[2 * func_num + bal, col].plot(t, best_hyperparam_mean, label=str(best_hyperparam[1]), lw=0.8)
+                    ax[2 * func_num + bal, col].fill_between(t, best_hyperparam_mean - best_hyperparam_std,
+                                                             best_hyperparam_mean + best_hyperparam_std, lw=0.8,
+                                                             alpha=0.08)
+
+                    ax[2 * func_num + bal, col].plot(t, worst_hyperparam_mean, label=str(worst_hyperparam[1]), lw=0.8)
+                    ax[2 * func_num + bal, col].fill_between(t, worst_hyperparam_mean - worst_hyperparam_std,
+                                                             worst_hyperparam_mean + worst_hyperparam_std, lw=0.8,
+                                                             alpha=0.08)
+
+                    ax[2 * func_num + bal, col].legend(title=legend_title, fontsize=5, title_fontsize=5)
+
+                ax[2 * func_num + bal, col].grid(True)
+                ax[2 * func_num + bal, col].set_xticks([i for i in range(2, class_seq_len + 1, int(class_seq_len / 5))])
+
+                if dataset_name == 'EMNIST':
+                    ax[2 * func_num + bal, col].set_ylim([0, 1])
+                else:
+                    ax[2 * func_num + bal, col].set_ylim([0.55, 1])
+
+                if func_num == 0 and bal == 0:
+                    if seq_type == 'low':
+                        ax[2 * func_num + bal, col].set_title('$\mathbf{q}_{\min} - A_{1}$ on train set')
+                    elif seq_type == 'high':
+                        ax[2 * func_num + bal, col].set_title('$\mathbf{q}_{\max} - A_{1}$ on train set')
+
+                bal_str = '' if bal == 0 else '_bal'
+                if seq_type == 'low':
+                    ax[2 * func_num + bal, col].set_ylabel(f'{func}{bal_str}')
+
+                # print(f'{dataset_name}, {func}{bal_str}, seq={seq_type}, best_hyperparam={best_hyperparam[1]}, worst_hyperparam={worst_hyperparam[1]}')
+
+            fig.suptitle(f'{dataset_name}, ram_buf_size={64}, eeprom_buf_size={128}', y=0.92)
+
+            if save_fig:
+                plt.savefig(os.path.join(config['plots_dir_path'],
+                                         f'{dataset_name}_grid_search_all_plots={str(show_all_plots).lower()}.pdf'))
 
 if __name__ == '__main__':
     # Get configuration parameters
@@ -646,19 +766,30 @@ if __name__ == '__main__':
     }
     plt.rcParams.update(rc_params)
 
+    # Analyse hyperparameter grid search results -----------------------------------------------------------------------
+    sub_sel_funcs = ['greedy', 'evo']
+    bal_list = [0, 1]
+    seq_types = ['low', 'high']
+    num_of_trials = 20
+    plot_hyperparameter_sweep(config, 'MNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials,
+                              show_all_plots=False, save_fig=True)
+    plot_hyperparameter_sweep(config, 'FashionMNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials,
+                              show_all_plots=False, save_fig=True)
+    plot_hyperparameter_sweep(config, 'EMNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials,
+                              show_all_plots=False, save_fig=True)
+    # ------------------------------------------------------------------------------------------------------------------
+
     buffer_sizes = [(32, 64),
                     (64, 128),
                     (256, 512),
                     (128, 256)]
 
     color_list = [mcolors.to_hex(cm.tab10(i / 7)) for i in range(8)]
-    color_dict = {buffer_size : color_list[i] for i, buffer_size in enumerate(buffer_sizes)}
+    color_dict = {buffer_size: color_list[i] for i, buffer_size in enumerate(buffer_sizes)}
 
     config['host'] = True
     textwidth = 395.8225
-    sub_sel_funcs = ['rand_bal', ['rand_greedy', 100], ['evo', 50]]
-    seq_types = ['low', 'high']
-    num_of_trials = 20
+    sub_sel_funcs = ['rand_bal', 'greedy_bal', 'evo_bal']
 
     # Get MNIST and FashionMNIST plots ---------------------------------------------------------------------------------
     print('Creating MNIST and FashionMNIST plots and tables...')
@@ -668,7 +799,7 @@ if __name__ == '__main__':
                     # (128, 256),
                     (256, 512)]
     plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
-                               textwidth=textwidth, color_dict=color_dict, save_fig=True)
+                             textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
     seq_types = ['high', 'low'] # Reverse seq order for table
     buffer_sizes = [(32, 64),
@@ -688,14 +819,15 @@ if __name__ == '__main__':
     print('Creating EMNIST plots and tables...')
     dataset_names = ['EMNIST']
     seq_types = ['low', 'high']
-    buffer_sizes = [(128, 256),
+    buffer_sizes = [# (32, 64),
+                    #(64, 128),
+                    (128, 256),
                     (256, 512)]
     plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
-                               textwidth=textwidth, color_dict=color_dict, save_fig=True)
+                             textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
     seq_types = ['high', 'low'] # Reverse seq order for table
     class_incr_acc_table(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
 
     plot_acc_time_pareto_front(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
                                textwidth, color_dict, save_fig=True)
-
