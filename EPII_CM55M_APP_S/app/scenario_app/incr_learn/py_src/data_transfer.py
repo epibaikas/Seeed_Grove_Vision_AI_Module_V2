@@ -81,7 +81,7 @@ if config['host']:
     util['reader'] = device_emulation.stdout
 else:
     # Start serial connection
-    ser = serial.Serial(config['port'], config['baudrate'], timeout=None)
+    ser = serial.Serial(config['port_1'], config['baudrate'], timeout=None)
     board_init(ser)
     util['writer'] = ser
     util['reader'] = ser

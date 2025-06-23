@@ -34,6 +34,7 @@ if __name__ == '__main__':
                         help='The experiment trial number used to adjust random seed for random sampling functions')
     parser.add_argument('--hyperparam', type=str, help='Use --hyperparam  to specify the name of the hyperparameter set')
     parser.add_argument('--target_dev', action='store_false', help='Use --target_dev flag when experiment will be run on the actual device')
+    parser.add_argument('--port', type=int, default=1, help='Use with --target_dev flag when experiment will be run on the actual device to specify serial port number')
 
     args = vars(parser.parse_args())
 
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     trial = args['trial']
     hyperparam = args['hyperparam']
     target_dev = args['target_dev']
+    port = args['port']
 
     # Check that the balancing argument is valid:
     if bal not in [0, 1]:
@@ -64,6 +66,11 @@ if __name__ == '__main__':
     # Adjust the random seed based on the trial number
     random_seed = config['random_seed'] + trial
     np.random.seed(random_seed)
+
+    if port > 0:
+        serial_port = config[f'port_{port}']
+    else:
+        raise ValueError('Invalid port number')
 
     bal_str = '_bal' if bal == 1 else ''
     print(f'{dataset_name}, sub_sel_func={sub_sel_func}{bal_str}, seq_type={seq_type}, trial={trial}')
@@ -229,7 +236,7 @@ if __name__ == '__main__':
         util['reader'] = device_emulation.stdout
     else:
         # Start serial connection
-        ser = serial.Serial(config['port'], config['baudrate'], timeout=None)
+        ser = serial.Serial(serial_port, config['baudrate'], timeout=None)
         board_init(ser)
         util['writer'] = ser
         util['reader'] = ser
