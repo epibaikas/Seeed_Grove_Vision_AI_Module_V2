@@ -9,13 +9,6 @@
 #include "protocol_functions.h"
 #include "util_functions.h"
 
-#ifdef HOST_PLATFORM
-    #include <sys/time.h>
-#elif defined(GROVE_VISION_WE2)
-    #include "hx_drv_timer.h"
-#endif
-
-
 void write_ram_buffer(struct FunctionArguments *fun_args) {
     int example_num = 0;
     int num_per_line = 8;
@@ -210,6 +203,7 @@ void greedy_subset_selection(struct FunctionArguments *fun_args) {
     int balanced_subset = 0;
     int num_iter = 1; 
     int num_per_line = 8;
+    int num_prob = 1;       // Number of probing points during optimization
     int sscanf_ret_value = 0;
 
     float max_avg_class_acc = 0.0;
@@ -220,10 +214,11 @@ void greedy_subset_selection(struct FunctionArguments *fun_args) {
     float mutation_rate = 0.1;
 
     long sub_sel_micros, eeprom_update_micros;
+    long prob_micros = 0;
+    int prob_iter = 1;
 
     #ifdef HOST_PLATFORM
         struct timeval start, end;
-        long seconds;
     #elif defined(GROVE_VISION_WE2)
         TIMER_CFG_T timer_cfg = setup_timer();
 
@@ -239,11 +234,17 @@ void greedy_subset_selection(struct FunctionArguments *fun_args) {
         uint32_t time_stop = 0;
     #endif
 
-    sscanf_ret_value = sscanf(fun_args->param, "%d %d %d %f", &balanced_subset, &num_per_line, &num_iter, &mutation_rate);
+    sscanf_ret_value = sscanf(fun_args->param, "%d %d %d %d %f", &balanced_subset, &num_per_line, &num_prob, &num_iter, &mutation_rate);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: greedy_subset_selection() parameters not parsed correctly\r\n");
         exit(1);
     }
+
+    if (num_iter % num_prob != 0) {
+        xprintf("probing error: num_iter not a multiple of num_prob\r\n");
+        exit(1);
+    }
+    prob_iter = num_iter / num_prob; // Probing takes place every prob_iter iterations
     
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
@@ -303,25 +304,30 @@ void greedy_subset_selection(struct FunctionArguments *fun_args) {
         }
 
         optim_func_buffer[i] = max_avg_class_acc;
+
+        if (((i+1) % prob_iter) == 0) {
+            #ifdef HOST_PLATFORM
+                prob_micros += probe_opt(subset_idxs, num_per_line, fun_args);
+            #elif defined(GROVE_VISION_WE2)
+                prob_micros += probe_opt(subset_idxs, num_per_line, fun_args, timer_id);
+            #endif        
+        }
     }
 
     // Stop time measurement
     #ifdef HOST_PLATFORM
         gettimeofday(&end, NULL);
-        seconds = end.tv_sec - start.tv_sec;
-        sub_sel_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+        sub_sel_micros = (end.tv_sec - start.tv_sec) * 1e6 + (end.tv_usec - start.tv_usec) - prob_micros;
     #elif defined(GROVE_VISION_WE2)
         time_stop = hx_drv_timer_GetValue(timer_id);
-        sub_sel_micros = time_start - time_stop; // (Tick counter counts down instead of up)
+        sub_sel_micros = time_start - time_stop - prob_micros; // (Tick counter counts down instead of up)
         hx_drv_timer_hw_stop(timer_id);
     #endif
 
     // Get label predictions using the latest subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
 
-    // Output generated subset, label predictions and max_avg_class_acc_buffer
-    read_buffer(subset_idxs, fun_args->eeprom_buffer_size, sizeof(uint16_t), num_per_line);
-    xprintf("subset_idxs_read_done\r\n");
+    // Output label predictions and max_avg_class_acc_buffer
     read_buffer(predicted_labels, fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
     xprintf("predicted_labels_read_done\r\n");
     read_buffer(optim_func_buffer, num_iter, sizeof(float), num_per_line);
@@ -341,8 +347,7 @@ void greedy_subset_selection(struct FunctionArguments *fun_args) {
     // Stop time measurement
     #ifdef HOST_PLATFORM
         gettimeofday(&end, NULL);
-        seconds = end.tv_sec - start.tv_sec;
-        eeprom_update_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+        eeprom_update_micros = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec;
         xprintf("Time measurements (us): %u, %u\r\n", sub_sel_micros, eeprom_update_micros);
     #elif defined(GROVE_VISION_WE2)
         time_stop = hx_drv_timer_GetValue(timer_id);    
@@ -362,6 +367,7 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     int balanced_subset = 0;
     int num_gen = 1; 
     int num_per_line = 8;
+    int num_prob = 1;       // Number of probing points during optimizations
     int sscanf_ret_value = 0;
 
     int population_size = 100;
@@ -375,10 +381,11 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     char fitness_str[45];
 
     long sub_sel_micros, eeprom_update_micros;
+    long prob_micros = 0;
+    int prob_gen = 1;
 
     #ifdef HOST_PLATFORM
         struct timeval start, end;
-        long seconds;
     #elif defined(GROVE_VISION_WE2)
         TIMER_CFG_T timer_cfg = setup_timer();
 
@@ -394,15 +401,21 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
         uint32_t time_stop = 0;
     #endif
 
-    sscanf_ret_value = sscanf(fun_args->param, "%d %d %d %d %d %f", &balanced_subset, &num_per_line, &num_gen, &population_size, &num_parents, &mutation_rate);
+    sscanf_ret_value = sscanf(fun_args->param, "%d %d %d %d %d %d %f", &balanced_subset, &num_per_line, &num_prob, &num_gen, &population_size, &num_parents, &mutation_rate);
     if (sscanf_ret_value <= 0) {
         xprintf("ack_error: evo_subset_selection() parameters not parsed correctly\r\n");
         exit(1);
     }
 
+    if (num_gen % num_prob != 0) {
+        xprintf("probing error: num_gen not a multiple of num_prob\r\n");
+        exit(1);
+    }
+    prob_gen = num_gen / num_prob; // Probing takes place every prob_gen generations
+
     xprintf("ack_begin %d\r\n", fun_args->seq_num);
 
-    int break_gen = num_gen;
+    // int break_gen = num_gen;
 
     // Allocate memory
     uint16_t **population = allocate_2D_array(population_size, fun_args->eeprom_buffer_size, "population");
@@ -462,6 +475,14 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     float_to_string(best_fitness, fitness_str, 4);
     xprintf("Gen 0, max fitness score: %s\r\n", fitness_str);
 
+    if ((1 % prob_gen) == 0) {
+        #ifdef HOST_PLATFORM
+            prob_micros += probe_opt(subset_idxs, num_per_line, fun_args);
+        #elif defined(GROVE_VISION_WE2)
+            prob_micros += probe_opt(subset_idxs, num_per_line, fun_args, timer_id);
+        #endif
+    }
+
     for (int n = 1; n < num_gen; n++) {
         // Parent selection
         steady_state_parent_selection(population, population_size, parents, num_parents, max_fitness_idxs, fun_args);
@@ -516,34 +537,39 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
         }
         optim_func_buffer[n] = best_fitness;
 
-        if (best_fitness >= 1.0) {
-            break_gen = n + 1;
-            break;
-        } 
+        if (((n+1) % prob_gen) == 0) {
+            #ifdef HOST_PLATFORM
+                prob_micros += probe_opt(subset_idxs, num_per_line, fun_args);
+            #elif defined(GROVE_VISION_WE2)
+                prob_micros += probe_opt(subset_idxs, num_per_line, fun_args, timer_id);
+            #endif
+        }
+
+        // if (best_fitness >= 1.0) {
+        //     break_gen = n + 1;
+        //     break;
+        // } 
     }
 
     // Dummy loop for printing remaining new lines 
-    for (int i = break_gen; i < num_gen; i++) {
-        xprintf("\r\n");
-    }
+    // for (int i = break_gen; i < num_gen; i++) {
+    //     xprintf("\r\n");
+    // }
 
     // Stop time measurement
     #ifdef HOST_PLATFORM
         gettimeofday(&end, NULL);
-        seconds = end.tv_sec - start.tv_sec;
-        sub_sel_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+        sub_sel_micros = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec - prob_micros;
     #elif defined(GROVE_VISION_WE2)
         time_stop = hx_drv_timer_GetValue(timer_id);
-        sub_sel_micros = time_start - time_stop; // (Tick counter counts down instead of up)
+        sub_sel_micros = time_start - time_stop - prob_micros; // (Tick counter counts down instead of up)
         hx_drv_timer_hw_stop(timer_id);
     #endif
 
     // Get label predictions using the latest subset
     classify_training_set(fun_args, subset_idxs, predicted_labels);
 
-    // Output generated subset, label predictions and max_avg_class_acc_buffer
-    read_buffer(subset_idxs, fun_args->eeprom_buffer_size, sizeof(uint16_t), num_per_line);
-    xprintf("subset_idxs_read_done\r\n");
+    // Output label predictions and max_avg_class_acc_buffer
     read_buffer(predicted_labels, fun_args->num_examples_total, sizeof(uint8_t), num_per_line);
     xprintf("predicted_labels_read_done\r\n");
     read_buffer(optim_func_buffer, num_gen, sizeof(float), num_per_line);
@@ -563,8 +589,7 @@ void evo_subset_selection(struct FunctionArguments *fun_args) {
     // Stop time measurement
     #ifdef HOST_PLATFORM
         gettimeofday(&end, NULL);
-        seconds = end.tv_sec - start.tv_sec;
-        eeprom_update_micros = (seconds * 1000000) + end.tv_usec - start.tv_usec;
+        eeprom_update_micros = (end.tv_sec - start.tv_sec) * 1e6 + end.tv_usec - start.tv_usec;
         xprintf("Time measurements (us): %u, %u\r\n", sub_sel_micros, eeprom_update_micros);
     #elif defined(GROVE_VISION_WE2)
         time_stop = hx_drv_timer_GetValue(timer_id);    

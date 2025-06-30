@@ -180,7 +180,7 @@ def rand_subset_selection(param_list, data_out, util):
 
     num_per_line = param_list[1]
 
-    read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
+    read_buffer(data_out[0][0], data_out[0][0].shape[0], num_per_line, util)
 
     resp_line = util['reader'].readline().decode()
     debug_print(resp_line, end='', debug=util['debug'])
@@ -218,29 +218,35 @@ def rand_subset_selection(param_list, data_out, util):
 
 
 def greedy_subset_selection(param_list, data_out, util):
-    if len(param_list) != 4:
+    if len(param_list) != 5:
         raise AssertionError('Incorrect param_list length')
 
     num_per_line = param_list[1]
-    num_iter = param_list[2]
+    num_prob = param_list[2]
+    num_iter = param_list[3]
 
-    # debugging ----------------------------------------------
+    prob_iter = int(num_iter / num_prob)
+    prob_count = 0
+
     # Prints the iterations of the greedy process
     for i in range(num_iter):
         resp_line = util['reader'].readline().decode()
         debug_print(resp_line, end='', debug=util['debug'])
         util['resp_logger'].info(resp_line.rstrip())
+
+        if (i + 1) % prob_iter == 0:
+            read_buffer(data_out[0][prob_count], data_out[0][prob_count].shape[0], num_per_line, util)
+
+            resp_line = util['reader'].readline().decode()
+            debug_print(resp_line, end='', debug=util['debug'])
+            util['resp_logger'].info(resp_line.rstrip())
+
+            resp_line = resp_line.replace('\r', '').replace('\n', '')
+            if resp_line != 'subset_idxs_read_done':
+                raise AssertionError('resp_line not properly received for subset_idxs read')
+
+            prob_count += 1
     # --------------------------------------------------------
-
-    read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
-
-    resp_line = util['reader'].readline().decode()
-    debug_print(resp_line, end='', debug=util['debug'])
-    util['resp_logger'].info(resp_line.rstrip())
-
-    resp_line = resp_line.replace('\r', '').replace('\n', '')
-    if resp_line != 'subset_idxs_read_done':
-        raise AssertionError('resp_line not properly received for subset_idxs read')
 
     read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
 
@@ -279,29 +285,35 @@ def greedy_subset_selection(param_list, data_out, util):
     return 0
 
 def evo_subset_selection(param_list, data_out, util):
-    if len(param_list) != 6:
+    if len(param_list) != 7:
         raise AssertionError('Incorrect param_list length')
 
     num_per_line = param_list[1]
-    num_gen = param_list[2]
+    num_prob = param_list[2]
+    num_gen = param_list[3]
 
-    # debugging ----------------------------------------------
-    # Prints the iterations of the greedy process
+    prob_gen = int(num_gen / num_prob)
+    prob_count = 0
+
+    # Prints the generations of the evolutionary process
     for i in range(num_gen):
         resp_line = util['reader'].readline().decode()
         debug_print(resp_line, end='', debug=util['debug'])
         util['resp_logger'].info(resp_line.rstrip())
+
+        if (i + 1) % prob_gen == 0:
+            read_buffer(data_out[0][prob_count], data_out[0][prob_count].shape[0], num_per_line, util)
+
+            resp_line = util['reader'].readline().decode()
+            debug_print(resp_line, end='', debug=util['debug'])
+            util['resp_logger'].info(resp_line.rstrip())
+
+            resp_line = resp_line.replace('\r', '').replace('\n', '')
+            if resp_line != 'subset_idxs_read_done':
+                raise AssertionError('resp_line not properly received for subset_idxs read')
+
+            prob_count += 1
     # --------------------------------------------------------
-
-    read_buffer(data_out[0], data_out[0].shape[0], num_per_line, util)
-
-    resp_line = util['reader'].readline().decode()
-    debug_print(resp_line, end='', debug=util['debug'])
-    util['resp_logger'].info(resp_line.rstrip())
-
-    resp_line = resp_line.replace('\r', '').replace('\n', '')
-    if resp_line != 'subset_idxs_read_done':
-        raise AssertionError('resp_line not properly received for subset_idxs read')
 
     read_buffer(data_out[1], data_out[1].shape[0], num_per_line, util)
 

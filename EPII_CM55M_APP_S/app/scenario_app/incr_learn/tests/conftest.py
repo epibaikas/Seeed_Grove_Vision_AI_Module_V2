@@ -83,7 +83,7 @@ def labels_buffer(config):
 
 @pytest.fixture
 def subset_idxs(config):
-    return np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
+    return np.zeros((config['num_prob'], config['N_EEPROM_BUFFER']), dtype=np.uint16)
 
 
 @pytest.fixture(scope='session', autouse=True)

@@ -76,3 +76,19 @@ void move_subset_to_eeprom(uint16_t *subset_idxs, size_t subset_size, struct Fun
 
     free(eeprom_indices_not_in_subset);
 }
+
+long probe_opt(uint16_t* subset_idxs, int num_per_line, struct FunctionArguments *fun_args) {
+    struct timeval prob_start, prob_end;
+    
+    // Start probing time measurement
+    gettimeofday(&prob_start, NULL);
+
+    // Probe subset_idxs
+    read_buffer(subset_idxs, fun_args->eeprom_buffer_size, sizeof(uint16_t), num_per_line);
+    xprintf("subset_idxs_read_done\r\n");
+
+    // Stop probing time measurement
+    gettimeofday(&prob_end, NULL);
+    
+    return (prob_end.tv_sec - prob_start.tv_sec) * 1e6 + (prob_end.tv_usec - prob_end.tv_usec);
+}

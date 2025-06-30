@@ -137,6 +137,7 @@ if __name__ == '__main__':
         sel_func = rand_subset_selection
         filename_prefix = exp_param + f'trial={trial}_'
         file_index_line = filename_prefix + file_index_line + ',,,,,,'
+        config['num_prob'] = 1
 
     elif sub_sel_func == 'greedy':
         sel_func = greedy_subset_selection
@@ -145,7 +146,7 @@ if __name__ == '__main__':
         config['mutation_rate'] = hyperparam_pd['mutation_rate'].iloc[0]
         filename_prefix = exp_param + f"num_iter={config['num_iter']}_mut={config['mutation_rate']:.2f}_" + f'trial={trial}_'
         file_index_line = filename_prefix + file_index_line + f",{config['num_iter']},,{config['mutation_rate']:.2f},,,{hyperparam}"
-        sel_func_param += [config['num_iter'], config['mutation_rate']]
+        sel_func_param += [config['num_prob'], config['num_iter'], config['mutation_rate']]
 
     elif sub_sel_func == 'evo':
         sel_func = evo_subset_selection
@@ -159,7 +160,7 @@ if __name__ == '__main__':
                             f"pop_size={config['population_size']}_num_par={config['num_parents']}_") +
                             f'trial={trial}_')
         file_index_line = filename_prefix + file_index_line + f",,{config['num_gen']},{config['mutation_rate']:.2f},{config['population_size']},{config['num_parents']},{hyperparam}"
-        sel_func_param += [config['num_gen'], config['population_size'], config['num_parents'], config['mutation_rate']]
+        sel_func_param += [config['num_prob'], config['num_gen'], config['population_size'], config['num_parents'], config['mutation_rate']]
 
     else:
         raise argparse.ArgumentTypeError('Invalid subset selection function')
@@ -181,8 +182,8 @@ if __name__ == '__main__':
     train_sets = []
 
     seq_num = 0
-    subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
-    optim_func_buffer = np.zeros(sel_func_param[2], dtype=float) if sub_sel_func == 'greedy' or sub_sel_func == 'evo' else []
+    subset_idxs = np.zeros((config['num_prob'], config['N_EEPROM_BUFFER']), dtype=np.uint16)
+    optim_func_buffer = np.zeros(sel_func_param[3], dtype=float) if sub_sel_func == 'greedy' or sub_sel_func == 'evo' else []
     time_measurements = np.zeros(2, dtype=np.uint64)
 
     # Keep track of the data examples that are currently on the device
@@ -192,12 +193,16 @@ if __name__ == '__main__':
     device_data_idxs = np.zeros(config['N_TOTAL'], dtype=np.uint32)
 
     acc_matrix = np.zeros(shape=(len(class_seq) - 1, len(class_seq) - 1), dtype=float)
-    acc_test_set_union = np.zeros(shape=(len(class_seq) - 1), dtype=float)
-    acc_train_set_union = np.zeros(shape=(len(class_seq) - 1), dtype=float)
-    acc_global = np.zeros(shape=(len(class_seq) - 1), dtype=float)
+    acc_test_set_union = np.zeros(shape=(len(class_seq) - 1, config['num_prob']), dtype=float)
+    acc_train_set_union = np.zeros(shape=(len(class_seq) - 1, config['num_prob']), dtype=float)
+    acc_global = np.zeros(shape=(len(class_seq) - 1, config['num_prob']), dtype=float)
 
     # Store the indices of the examples placed in EEPROM referenced with regard to the full training set
     EEPROM_trainset_idxs = []
+
+    # Store the example indices of the subsets recorded at the probing points of the optimization process,
+    # referenced with regard to the full training set
+    subset_trainset_idxs = []
 
     # Create log/txt directory if it doesn't exist
     log_txt_dir_path = os.path.join(config['log_dir_path'], 'txt')
@@ -307,21 +312,23 @@ if __name__ == '__main__':
             expected_classifier.train(device_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=config['bitshift'])
 
             expected_predicted_labels = expected_classifier.predict(device_data[:, 0:config['data_bytes_per_example']],
-                                        subset_idxs, train_classifier=False, k=config['k_kNN'])
+                                        subset_idxs[-1], train_classifier=False, k=config['k_kNN'])
             assert np.array_equal(expected_predicted_labels[0:num_examples_total], predicted_labels)
             # for i in range(num_examples_total):
             #     print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is',
             #           (expected_predicted_labels[i] == predicted_labels[i]))
             #     assert expected_predicted_labels[i] == predicted_labels[i]
 
+            subset_trainset_idxs.append([device_data_idxs[subset_idxs[i]].tolist() for i in range(config['num_prob'])])
+
             # Update device_data to mirror the data in EEPROM
-            subset_idxs.sort()
-            subset_idxs_set = set(subset_idxs)
+            subset_idxs[-1].sort()
+            subset_idxs_set = set(subset_idxs[-1])
             EEPROM_idxs = set(range(config['N_RAM_BUFFER'], config['N_TOTAL']))
             EEPROM_idxs_to_be_replaced = list(EEPROM_idxs - EEPROM_idxs.intersection(subset_idxs_set))
             EEPROM_idxs_to_be_replaced.sort()
 
-            RAM_idxs = [i for i in subset_idxs if i < config['N_RAM_BUFFER']]
+            RAM_idxs = [i for i in subset_idxs[-1] if i < config['N_RAM_BUFFER']]
             assert len(RAM_idxs) == len(EEPROM_idxs_to_be_replaced)
 
             for i, idx in enumerate(RAM_idxs):
@@ -334,6 +341,9 @@ if __name__ == '__main__':
             device_data[(t+1)*config['N_RAM_BUFFER'] : (t+2)*config['N_RAM_BUFFER'], :] = device_data[0:config['N_RAM_BUFFER'], :]
             device_data_idxs[(t+1)*config['N_RAM_BUFFER'] : (t+2)*config['N_RAM_BUFFER']] = device_data_idxs[0:config['N_RAM_BUFFER']]
             num_examples_in_eeprom += config['N_RAM_BUFFER']
+
+            if t > 0:
+                subset_trainset_idxs.append([device_data_idxs[config['N_RAM_BUFFER'] : config['N_RAM_BUFFER'] + num_examples_in_eeprom].tolist()])
 
 
         if t > 0:
@@ -349,16 +359,25 @@ if __name__ == '__main__':
             train_set_union += train_sets[i]
 
         if t > 0:
-            # Evaluate top-1 accuracy over the union of all test sets from the classes available up to this stage
-            acc_test_set_union[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1], test_subset_idxs=test_set_union, k_kNN=config['k_kNN'])
+            assert set(subset_trainset_idxs[t-1][-1]) == set(EEPROM_trainset_idxs[t-1])
 
-            # Evaluate top-1 accuracy over the union of all train examples provided to the device up to this stage
-            eval_classifier = kNearestNeighbors(X_train[EEPROM_trainset_idxs[t-1]], y_train[EEPROM_trainset_idxs[t-1]])
-            eval_classifier.train(X_train[train_set_union], symmetric=False, zero_to_max=True, bitshift=config['bitshift'])
-            acc_train_set_union[t - 1] = ACC(eval_classifier, X_train[train_set_union], y_train[train_set_union], subset_idxs=[], k_kNN=config['k_kNN'])
+            for i in range(len(subset_trainset_idxs[t-1])):
+                # Check if the subset is new to avoid recomputing accuracy values
+                if set(subset_trainset_idxs[t - 1][i]) != set(subset_trainset_idxs[t - 1][i - 1]) or len(subset_trainset_idxs[t-1]) == 1:
+                    # Evaluate top-1 accuracy over the union of all test sets from the classes available up to this stage
+                    acc_test_set_union[t - 1][i] = ACC(classifier, X_test, y_test, subset_idxs=subset_trainset_idxs[t-1][i], test_subset_idxs=test_set_union, k_kNN=config['k_kNN'])
 
-            # Evaluate top-1 accuracy over the complete test set, containing test examples from all classes.
-            acc_global[t - 1] = ACC(classifier, X_test, y_test, subset_idxs=EEPROM_trainset_idxs[t-1], k_kNN=config['k_kNN'])
+                    # Evaluate top-1 accuracy over the union of all train examples provided to the device up to this stage
+                    eval_classifier = kNearestNeighbors(X_train[subset_trainset_idxs[t-1][i]], y_train[subset_trainset_idxs[t-1][i]])
+                    eval_classifier.train(X_train[train_set_union], symmetric=False, zero_to_max=True, bitshift=config['bitshift'])
+                    acc_train_set_union[t - 1][i] = ACC(eval_classifier, X_train[train_set_union], y_train[train_set_union], subset_idxs=[], k_kNN=config['k_kNN'])
+
+                    # Evaluate top-1 accuracy over the complete test set, containing test examples from all classes.
+                    acc_global[t - 1][i] = ACC(classifier, X_test, y_test, subset_idxs=subset_trainset_idxs[t-1][i], k_kNN=config['k_kNN'])
+                else:
+                    acc_test_set_union[t - 1][i] = acc_test_set_union[t - 1][i-1]
+                    acc_train_set_union[t - 1][i] = acc_train_set_union[t - 1][i-1]
+                    acc_global[t - 1][i] = acc_global[t - 1][i-1]
 
     # Create results directory if it doesn't exist
     if not os.path.exists(config['results_dir_path']):
@@ -368,7 +387,8 @@ if __name__ == '__main__':
                     'acc_test_set_union': acc_test_set_union,
                     'acc_train_set_union': acc_train_set_union,
                     'acc_global': acc_global,
-                    'EEPROM_trainset_idxs': EEPROM_trainset_idxs}
+                    'EEPROM_trainset_idxs': EEPROM_trainset_idxs,
+                    'subset_trainset_idxs': subset_trainset_idxs}
 
     with open(os.path.join(config['results_dir_path'], filename_prefix + 'results_dict.pkl'), 'wb') as f:
         pickle.dump(results_dict, f)

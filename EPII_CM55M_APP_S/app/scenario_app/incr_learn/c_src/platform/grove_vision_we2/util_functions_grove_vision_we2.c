@@ -124,3 +124,19 @@ TIMER_CFG_T setup_timer() {
 
     return timer_cfg;
 }
+
+long probe_opt(uint16_t* subset_idxs, int num_per_line, struct FunctionArguments *fun_args, TIMER_ID_E timer_id) {
+     uint32_t prob_time_start = 0;
+     uint32_t prob_time_stop = 0;
+
+    // Start probing time measurement
+    prob_time_start = hx_drv_timer_GetValue(timer_id);
+
+    // Probe subset_idxs
+    read_buffer(subset_idxs, fun_args->eeprom_buffer_size, sizeof(uint16_t), num_per_line);
+    xprintf("subset_idxs_read_done\r\n");
+
+    // Stop probing time measurement
+    prob_time_stop = hx_drv_timer_GetValue(timer_id);
+    return prob_time_start - prob_time_stop; // (Tick counter counts down instead of up)
+}

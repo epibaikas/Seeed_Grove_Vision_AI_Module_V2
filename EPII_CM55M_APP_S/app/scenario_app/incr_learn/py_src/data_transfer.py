@@ -39,7 +39,7 @@ expected_classifier = kNearestNeighbors(img_data[:, 0:config['data_bytes_per_exa
 expected_classifier.train(img_data[:, 0:config['data_bytes_per_example']], symmetric=True, bitshift=config['bitshift'])
 
 labels_buffer = np.zeros(config['N_TOTAL'], dtype=np.uint8)
-subset_idxs = np.zeros(config['N_EEPROM_BUFFER'], dtype=np.uint16)
+subset_idxs = np.zeros((config['num_prob'], config['N_EEPROM_BUFFER']), dtype=np.uint16)
 predicted_labels = np.zeros(config['N_TOTAL'], dtype=np.uint8)
 optim_func_buffer = np.zeros(config['num_iter'], dtype=float)
 time_measurements = np.zeros(2, dtype=np.uint64)
@@ -132,11 +132,11 @@ seq_num += 1
 # Check correctness of read labels
 assert np.array_equal(img_data[:, config['bytes_per_example'] - 1], labels_buffer)
 
-send_command(greedy_subset_selection, seq_num=seq_num, param_list=[1, 200, config['num_iter'], config['mutation_rate']], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
+send_command(greedy_subset_selection, seq_num=seq_num, param_list=[1, 200, config['num_prob'], config['num_iter'], config['mutation_rate']], util=util, data_out=[subset_idxs, predicted_labels, optim_func_buffer, time_measurements])
 seq_num += 1
 
 # Check if predicted labels match the expected predicted labels
-expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs, train_classifier=False, k=config['k_kNN'])
+expected_predicted_labels = expected_classifier.predict(img_data[:, 0:config['data_bytes_per_example']], subset_idxs[-1], train_classifier=False, k=config['k_kNN'])
 
 for i, _ in enumerate(predicted_labels):
     print('i =', i, ',', expected_predicted_labels[i], '==', predicted_labels[i], 'is', (expected_predicted_labels[i] == predicted_labels[i]))
