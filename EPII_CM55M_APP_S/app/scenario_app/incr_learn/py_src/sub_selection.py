@@ -363,7 +363,7 @@ if __name__ == '__main__':
 
             for i in range(len(subset_trainset_idxs[t-1])):
                 # Check if the subset is new to avoid recomputing accuracy values
-                if set(subset_trainset_idxs[t - 1][i]) != set(subset_trainset_idxs[t - 1][i - 1]) or len(subset_trainset_idxs[t-1]) == 1:
+                if i == 0 or (i > 0 and (set(subset_trainset_idxs[t - 1][i]) != set(subset_trainset_idxs[t - 1][i - 1]))):
                     # Evaluate top-1 accuracy over the union of all test sets from the classes available up to this stage
                     acc_test_set_union[t - 1][i] = ACC(classifier, X_test, y_test, subset_idxs=subset_trainset_idxs[t-1][i], test_subset_idxs=test_set_union, k_kNN=config['k_kNN'])
 

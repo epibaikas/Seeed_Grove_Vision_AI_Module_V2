@@ -27,6 +27,7 @@ if __name__ == '__main__':
                         help='The size of the EEPROM buffer given in KBs')
     parser.add_argument('--hyperparam', type=str, help='Use --hyperparam  to specify the name of hyperparameters artifact file')
     parser.add_argument('--target_dev', action='store_false', help='Use --target_dev flag when experiments will be run on the actual device')
+    parser.add_argument('--port', type=int, default=1, help='Use with --target_dev flag when experiment will be run on the actual device to specify serial port number')
 
     args = vars(parser.parse_args())
 
@@ -38,6 +39,7 @@ if __name__ == '__main__':
     eeprom_buf_size = args['eeprom_buf_size']
     hyperparam = args['hyperparam']
     host = args['target_dev']
+    port = args['port']
 
     print(f'host={host}')
 
@@ -97,10 +99,10 @@ if __name__ == '__main__':
             for seq_type in seq_types:
                 if hyperparam is None:
                     args = [dataset_name, sub_sel_func, str(bal), seq_type, str(ram_buf_size),
-                        str(eeprom_buf_size), str(trial), '--target_dev']
+                        str(eeprom_buf_size), str(trial), '--target_dev', '--port', str(port)]
                 else:
                     args = [dataset_name, sub_sel_func, str(bal), seq_type, str(ram_buf_size),
-                        str(eeprom_buf_size), str(trial), '--hyperparam', hyperparam, '--target_dev']
+                        str(eeprom_buf_size), str(trial), '--hyperparam', hyperparam, '--target_dev', '--port', str(port)]
                 
                 process = subprocess.Popen(["python", py_file_path] + args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, text=True, bufsize=1)
 
