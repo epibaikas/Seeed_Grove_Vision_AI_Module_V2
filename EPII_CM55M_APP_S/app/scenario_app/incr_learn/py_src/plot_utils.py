@@ -203,8 +203,8 @@ def extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, bu
         compute_dist_time_list = []
 
         sub_sel_func_time_list = [[] for _ in range(0, len(sub_sel_funcs))]
-        sub_sel_func_time_median = np.zeros(len(sub_sel_funcs))
-        sub_sel_func_time_iqr = np.zeros(len(sub_sel_funcs))
+        sub_sel_func_time_mean = np.zeros(len(sub_sel_funcs))
+        sub_sel_func_time_std = np.zeros(len(sub_sel_funcs))
 
         for i, func in enumerate(sub_sel_funcs):
             for seq_type in seq_types:
@@ -232,13 +232,19 @@ def extract_time_measurements(config, dataset_name, sub_sel_funcs, seq_types, bu
                     compute_dist_time_list += get_resp_elapsed_time(root, 'compute_dist_matrix', datetime_formats)
                     sub_sel_func_time_list[i] += get_sub_sel_time(root, func.strip('_bal') + '_subset_selection')
 
-            sub_sel_func_time_median[i] = np.median(np.array(sub_sel_func_time_list[i]))
-            q1 = np.percentile(np.array(sub_sel_func_time_list[i]), 25)
-            q3 = np.percentile(np.array(sub_sel_func_time_list[i]), 75)
-            sub_sel_func_time_iqr[i] = q3 - q1
+            sub_sel_func_time_mean[i] = np.mean(np.array(sub_sel_func_time_list[i]))
+            sub_sel_func_time_std[i] = np.std(np.array(sub_sel_func_time_list[i]))
 
-            time_measurements[buffer_size_num, i, 0] = sub_sel_func_time_median[i]
-            time_measurements[buffer_size_num, i, 1] = sub_sel_func_time_iqr[i]
+            time_measurements[buffer_size_num, i, 0] = sub_sel_func_time_mean[i]
+            time_measurements[buffer_size_num, i, 1] = sub_sel_func_time_std[i]
+
+            # sub_sel_func_time_median[i] = np.median(np.array(sub_sel_func_time_list[i]))
+            # q1 = np.percentile(np.array(sub_sel_func_time_list[i]), 25)
+            # q3 = np.percentile(np.array(sub_sel_func_time_list[i]), 75)
+            # sub_sel_func_time_iqr[i] = q3 - q1
+
+            # time_measurements[buffer_size_num, i, 0] = sub_sel_func_time_median[i]
+            # time_measurements[buffer_size_num, i, 1] = sub_sel_func_time_iqr[i]
 
         list_of_sub_sel_func_time_lists.append(sub_sel_func_time_list)
 
