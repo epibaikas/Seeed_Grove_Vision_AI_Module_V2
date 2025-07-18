@@ -116,13 +116,28 @@ def compute_backward_transfer(acc_matrix):
 
     return bwt
 
+def get_pareto_front(x_list, y_list):
+    points = np.array(list(zip(x_list, y_list)))
+
+    # Sort by x ascending, then y ascending
+    points = points[np.argsort(points[:, 0])]
+
+    # Pareto front extraction (we want to minimize x and maximize y)
+    pareto_front = [points[0]]
+    for point in points[1:]:
+        if point[1] > pareto_front[-1][1]:  # better y (higher) than last kept point
+            pareto_front.append(point)
+
+    pareto_front = np.array(pareto_front)
+    return pareto_front
 
 def extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials):
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
     class_seq_len = class_sequences.shape[1]
 
     df = pd.read_csv(os.path.join(config['log_dir_path'], config['file_index']))
-    data = np.zeros((len(eval_metrics), len(buffer_sizes), len(seq_types), len(sub_sel_funcs), 2, class_seq_len - 1))
+    data = np.zeros((len(eval_metrics), len(buffer_sizes), len(seq_types), len(sub_sel_funcs), 2, class_seq_len - 1,
+                     config['num_prob']))
 
     for col, seq_type in enumerate(seq_types):
         for row, eval_metric in enumerate(eval_metrics):
@@ -137,7 +152,7 @@ def extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, se
                 bal = 1 if '_bal' in func else 0
 
                 for buffer_size_pair_num, (ram_buffer_size, eeprom_buffer_size) in enumerate(buffer_sizes):
-                    metric = np.zeros((num_of_trials, class_seq_len - 1), dtype=float)
+                    metric = np.zeros((num_of_trials, class_seq_len - 1, config['num_prob']), dtype=float)
 
                     filtered_df = df[(df['dataset_name'] == dataset_name) & (df['emulation'] == config['host']) &
                                      (df['sub_sel_func'] == func.strip('_bal')) &
@@ -152,16 +167,27 @@ def extract_line_plot_data(config, dataset_name, eval_metrics, sub_sel_funcs, se
                                   'rb') as f:
                             results_dict = pickle.load(f)
 
-                        if eval_metric != 'bwt':
-                            metric[trial, :] = results_dict[eval_metric]
-                        else:
-                            metric[trial, :] = compute_backward_transfer(results_dict['acc_matrix'])
+                        # if eval_metric != 'bwt':
+                        try:
+                            metric[trial, :, :] = results_dict[eval_metric]
+                        except:
+                            error = 1
+                            print(f"{filename_prefix}, trial={trial}")
+
+                        # else:
+                        #     metric[trial, :] = compute_backward_transfer(results_dict['acc_matrix'])
 
                     metric_mean = np.mean(metric, axis=0)
                     metric_std = np.std(metric, axis=0)
 
-                    data[row, buffer_size_pair_num, col, func_num, 0, :] = metric_mean
-                    data[row, buffer_size_pair_num, col, func_num, 1, :] = metric_std
+                    data[row, buffer_size_pair_num, col, func_num, 0, :, :] = metric_mean
+                    # Replace zeros in first row with the first element of the row (no optimization occurs)
+                    data[row, buffer_size_pair_num, col, func_num, 0, 0, :] = metric_mean[0, 0]
+
+                    data[row, buffer_size_pair_num, col, func_num, 1, :, :] = metric_std
+                    # Replace zeros in first row with the first element of the row (no optimization occurs)
+                    data[row, buffer_size_pair_num, col, func_num, 1, 0, :] = metric_std[0, 0]
+
     return data
 
 
@@ -240,8 +266,8 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
             for row, eval_metric in enumerate(eval_metrics):
                 for func_num, func in enumerate(sub_sel_funcs):
                     for buffer_size_pair_num, (ram_buffer_size, eeprom_buffer_size) in enumerate(buffer_sizes):
-                        metric_mean = data[row, buffer_size_pair_num, col, func_num, 0, :]
-                        metric_std = data[row, buffer_size_pair_num, col, func_num, 1, :]
+                        metric_mean = data[row, buffer_size_pair_num, col, func_num, 0, :, -1]
+                        metric_std = data[row, buffer_size_pair_num, col, func_num, 1, :, -1]
 
                         color = 'b'
                         if func == 'rand_bal':
@@ -373,6 +399,8 @@ def plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buf
         for median_num, median in enumerate(box['medians']):
             median.set_color(color_dict[(ram_buffer_size, eeprom_buffer_size)])  # Change to any color you like
 
+        # height = np.mean(list_of_sub_sel_func_time_lists[color_idx], axis=1)
+        # yerr = np.std(list_of_sub_sel_func_time_lists[color_idx], axis=1)
         # ax.bar(x + (color_idx * width - (len(buffer_sizes) - 1) * width/2), height, width, label=label, color=color_dict[(ram_buffer_size, eeprom_buffer_size)])
         # ax.errorbar(x + (color_idx * width - (len(buffer_sizes) - 1) * width / 2), y=height, yerr=yerr, fmt='o', color='r')
 
@@ -438,13 +466,13 @@ def class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_
 
                     for i in data_idxs:
                         for func_num, func in enumerate(sub_sel_funcs):
-                            metric_mean = data[eval_metric_num, buffer_size_pair_num, seq_num, func_num, 0, i]
+                            metric_mean = data[eval_metric_num, buffer_size_pair_num, seq_num, func_num, 0, i, -1]
                             metric_mean *= 100
 
                             if func == 'rand_bal':
                                 print(f'{metric_mean:.2f} & ', end='', file=f)
                             else:
-                                rand_bal_metric_mean = data[eval_metric_num, buffer_size_pair_num, seq_num, 0, 0, i]
+                                rand_bal_metric_mean = data[eval_metric_num, buffer_size_pair_num, seq_num, 0, 0, i, -1]
                                 diff = metric_mean - rand_bal_metric_mean * 100
                                 print(f'{diff:.2f} & ', end='', file=f)
 
@@ -533,30 +561,47 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
     width_in, height_in = set_size(width=textwidth, subplots=(len(eval_metrics), len(num_of_classes)))
     fig, ax = plt.subplots(nrows=len(eval_metrics), ncols=len(num_of_classes), figsize=(width_in, 3.8))
 
-    func_marker_dict = {'rand_bal': 'o', 'greedy_bal': '^', 'evo_bal': 's'}
+    func_marker_dict = {'rand': 'D', 'rand_bal': 'o', 'greedy_bal': '^', 'evo_bal': 's'}
 
     for eval_metric_num, eval_metric in enumerate(eval_metrics):
         for col, data_idx in enumerate(data_idxs):
             for buffer_size_pair_num, buffer_size_pair in enumerate(buffer_sizes):
                 t_list = []
-                acc_list = []
+                acc_low_list = []
+                acc_high_list = []
                 color = color_dict[buffer_size_pair]
 
                 for func_num, func in enumerate(sub_sel_funcs):
                     marker = func_marker_dict[func[0]] if isinstance(func, list) else func_marker_dict[func]
 
                     t = time_measurements[buffer_size_pair_num, func_num, 0]
-                    t_list.append(t)
 
-                    # Take the mean of the top-1 acc between q_max and q_min
-                    acc = np.mean(acc_data[eval_metric_num, buffer_size_pair_num, :, func_num, 0, data_idx])
-                    acc_list.append(acc)
+                    time_points = [0, 4, 9, config['num_prob'] - 1] if func == 'greedy_bal' or func == 'evo_bal' else [config['num_prob'] - 1]
 
-                    ax[eval_metric_num, col].scatter(t, acc, marker=marker, s=10, color=color)
+                    for time_point in time_points:
+                        mult = (time_point + 1) / config['num_prob']
+                        t_adj = t * mult
+                        t_list.append(t_adj)
 
-                ax[eval_metric_num, col].plot(t_list, acc_list, color=color, linestyle='--', linewidth=0.5,
+                        acc_low = np.mean(acc_data[eval_metric_num, buffer_size_pair_num, 1, func_num, 0, data_idx, time_point])
+                        acc_high = np.mean(acc_data[eval_metric_num, buffer_size_pair_num, 0, func_num, 0, data_idx, time_point])
+
+                        acc_low_list.append(acc_low)
+                        acc_high_list.append(acc_high)
+
+                        ax[eval_metric_num, col].scatter(t_adj, acc_low, marker=marker, s=3,  linewidth=0.3, edgecolor=color, facecolor='none')
+                        ax[eval_metric_num, col].scatter(t_adj, acc_high, marker=marker, s=3, linewidth=0.3, edgecolor=color, facecolor='none')
+                        ax[eval_metric_num, col].scatter(t_adj, acc_high, marker=marker, s=3, linewidth=0, edgecolor='none', facecolor=color, alpha=0.3)
+
+                pareto_front_low = get_pareto_front(t_list, acc_low_list)
+                ax[eval_metric_num, col].step(pareto_front_low[:, 0], pareto_front_low[:, 1], where='post', color=color, linestyle='--', linewidth=0.3,
                                               label=str(buffer_size_pair))
 
+                pareto_front_high = get_pareto_front(t_list, acc_high_list)
+                ax[eval_metric_num, col].step(pareto_front_high[:, 0], pareto_front_high[:, 1], where='post', color=color, linestyle='-', linewidth=0.3,
+                                              label=str(buffer_size_pair))
+
+            ax[eval_metric_num, col].set_axisbelow(True)
             ax[eval_metric_num, col].set_xscale('log')
             ax[eval_metric_num, col].set_xlim([2e-6, 1e3])
             major_ticks = [math.pow(10, exp) for exp in range(-5, 5, 2)]
@@ -573,9 +618,9 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
             ax[eval_metric_num, col].grid(True, which='major')
 
             if dataset_name == 'MNIST':
-                ax[eval_metric_num, col].set_ylim([0.65, 1.0])
+                ax[eval_metric_num, col].set_ylim([0.4, 1.0])
             elif dataset_name == 'FashionMNIST':
-                ax[eval_metric_num, col].set_ylim([0.5, 0.9])
+                ax[eval_metric_num, col].set_ylim([0.3, 1.0])
             else:
                 ax[eval_metric_num, col].set_ylim([0.3, 1.0])
 
@@ -598,7 +643,7 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
     if dataset_name == 'MNIST':
         colors = [color_dict[buffer_size] for buffer_size in buffer_sizes[::-1]]
         # Plot dummy lines
-        lines = [ax[1, 0].plot([], [], color=color, linestyle='--', linewidth=0.8)[0] for color in colors]
+        lines = [ax[1, 0].plot([], [], color=color, linestyle='-', linewidth=0.8)[0] for color in colors]
         ax[1, 0].legend(lines, buffer_sizes[::-1], title='Volatile and non-\nvolatile buf. (kB):',
                         loc='lower center', fancybox=False, shadow=False, fontsize=6)
 
@@ -660,7 +705,11 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
                                   'rb') as f:
                             results_dict = pickle.load(f)
 
-                        metric[file_num, :] = results_dict['acc_train_set_union']
+                        if results_dict['acc_train_set_union'].ndim == 2:
+                            metric[file_num, 0] = results_dict['acc_train_set_union'][0, 0]
+                            metric[file_num, 1:] = results_dict['acc_train_set_union'][1:, -1]
+                        else:
+                            metric[file_num, :] = results_dict['acc_train_set_union']
 
                     metric_mean = np.mean(metric, axis=0)
                     metric_std = np.std(metric, axis=0)
@@ -810,8 +859,8 @@ if __name__ == '__main__':
         class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
         plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
                                 textwidth, color_dict, save_fig=True)
-        plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
-                                textwidth, color_dict, save_fig=True)
+        plot_acc_time_pareto_front(config, dataset_name, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
+                                   seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=True)
 
     timing_measurements_table(config, 'MNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
 
