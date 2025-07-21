@@ -526,13 +526,13 @@ def timing_measurements_table(config, dataset_name, sub_sel_funcs, seq_types, bu
                 for func_num, _ in enumerate(sub_sel_funcs):
                     if dev_type == 'HPC':
                         print(
-                            f"{hpc_time_measurements[buffer_size_pair_num, func_num, 0]:.2e} & & {hpc_time_measurements[buffer_size_pair_num, func_num, 1]:.2e} & ",
+                            rf"{hpc_time_measurements[buffer_size_pair_num, func_num, 0]:.6f} & & {hpc_time_measurements[buffer_size_pair_num, func_num, 1]:.6f} & ",
                             end='', file=f)
                     else:
                         multiplier = dev_time_measurements[buffer_size_pair_num, func_num, 0] / hpc_time_measurements[
                             buffer_size_pair_num, func_num, 0]
                         print(
-                            rf"{dev_time_measurements[buffer_size_pair_num, func_num, 0]:.2e} & \text{{$(\times\;${multiplier:1.1f})}} & {dev_time_measurements[buffer_size_pair_num, func_num, 1]:.2e} & ",
+                            rf"{dev_time_measurements[buffer_size_pair_num, func_num, 0]:.6f} & \text{{$(\times\;${multiplier:1.1f})}} & {dev_time_measurements[buffer_size_pair_num, func_num, 1]:.6f} & ",
                             end='', file=f)
 
                 # Delete last two characters
