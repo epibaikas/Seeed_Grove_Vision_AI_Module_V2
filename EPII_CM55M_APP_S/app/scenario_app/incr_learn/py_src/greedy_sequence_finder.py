@@ -105,7 +105,7 @@ def find_first_pair(available_classes, k_kNN):
     return highest_acc_pair, lowest_acc_pair, fully_separable_pairs
 
 
-# Create an argument parser to set the dataset, non-volatile memory size (in MBs) and trial number
+# Create an argument parser to set the dataset
 parser = argparse.ArgumentParser(
     'Greedy algorithm for finding the class sequences with highest and lowest accuracies in a class-incremental '
     'learning scenario with non-volatile memory restrictions.')
@@ -151,16 +151,10 @@ else:
     np.save(path_1, classifier.dists)
     np.save(path_2, classifier.sorting_idxs)
 
-k_kNN = 1
-max_acc = 0
-for k in [1, 3, 5, 7, 9, 11]:
-    acc = ACC(classifier, X_test, y_test, subset_idxs=[], k_kNN=k)
-    print(f'k_kNN = {k}, Top-1 test accuracy = {acc}')
-    if acc > max_acc:
-        max_acc = acc
-        k_kNN = k
-print(f'Best k_kNN = {k_kNN}')
-np.save(config['artifacts_dir_path'] + dataset_name + '_k_kNN.npy', np.array(k_kNN))
+try:
+    k_kNN = int(np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_k_kNN.npy')))
+except:
+    raise FileNotFoundError(f"File {os.path.join(config['artifacts_dir_path'], dataset_name + '_k_kNN.npy')} not found")
 
 # Create a list of available class numbers out of which a sequence can be created
 available_classes = [x for x in range(len(train_set.classes))]
