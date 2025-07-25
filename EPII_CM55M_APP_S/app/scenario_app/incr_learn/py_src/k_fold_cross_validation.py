@@ -39,7 +39,7 @@ if __name__ == '__main__':
     y_test = y_test.numpy().astype(np.uint8)
 
     # Define KFold
-    k_folds = 5
+    k_folds = 6
     kfold = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=42)
 
     val_classifier = kNearestNeighbors(X_train, y_train)

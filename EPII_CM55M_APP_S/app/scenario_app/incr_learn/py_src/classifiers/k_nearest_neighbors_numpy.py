@@ -105,9 +105,11 @@ class kNearestNeighbors(object):
         X = X.astype(np.uint32)
         self.X_train = self.X_train.astype(np.uint32)
 
-        X_dot = np.multiply(X, X).sum(axis=1).reshape((X.shape[0], 1)) * np.ones(shape=(1, self.X_train.shape[0]), dtype=np.uint32)
-        X_train_dot = np.multiply(self.X_train, self.X_train).sum(axis=1) * np.ones(shape=(X.shape[0], 1), dtype=np.uint32)
-        dists = X_dot + X_train_dot - 2 * X @ self.X_train.T  # Ignore computing the square root for efficiency
+        # X_dot
+        dists = np.multiply(X, X).sum(axis=1).reshape((X.shape[0], 1)) * np.ones(shape=(1, self.X_train.shape[0]), dtype=np.uint32)
+        # X_dot + X_train_dot
+        dists += np.multiply(self.X_train, self.X_train).sum(axis=1) * np.ones(shape=(X.shape[0], 1), dtype=np.uint32)
+        dists -= 2 * X @ self.X_train.T  # Ignore computing the square root for efficiency
         dists = dists >> bitshift
 
         # Set every cell along the diagonal equal to 0xFFFF
