@@ -3,6 +3,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.ticker as ticker
+from matplotlib.ticker import AutoMinorLocator
 import matplotlib.colors as mcolors
 import os
 import sys
@@ -628,7 +629,7 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
             elif dataset_name == 'FashionMNIST':
                 ax[eval_metric_num, col].set_ylim([0.3, 1.0])
             else:
-                ax[eval_metric_num, col].set_ylim([0.3, 1.0])
+                ax[eval_metric_num, col].set_ylim([0.0, 1.0])
 
             if col > 0:
                 ax[eval_metric_num, col].set_yticklabels([])
@@ -659,7 +660,7 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
                    list(func_marker_dict.keys())]
         ax[1, 1].legend(scatter, func_names, title='Sub. sel. funcs.', fontsize=6)
 
-    fig.suptitle(f'{dataset_name}')
+    fig.suptitle(f'{dataset_name}', y=0.95)
 
     if save_fig:
         plt.tight_layout()
@@ -669,19 +670,22 @@ def plot_acc_time_pareto_front(config, dataset_name, sub_sel_funcs, seq_types, b
         plt.show()
 
 
-def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq_types, num_of_trials,
+def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq_types, num_of_trials, textwidth,
                               show_all_plots=False, save_fig=False):
     class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
     class_seq_len = class_sequences.shape[1]
     ram_buffer_size, eeprom_buffer_size = 64, 128
 
+    width_in, _ = set_size(width=textwidth, subplots=(len(sub_sel_funcs) * len(bal_list), len(seq_types)))
+    height_in = 2.4
+
     df = pd.read_csv(os.path.join(config['log_dir_path'], config['file_index']))
 
-    fig, ax = plt.subplots(nrows=len(sub_sel_funcs) * len(bal_list), ncols=len(seq_types), figsize=(4.5, 11))
+    fig, ax = plt.subplots(nrows=len(sub_sel_funcs) * len(bal_list), ncols=len(seq_types), figsize=(width_in, height_in))
 
     for col, seq_type in enumerate(seq_types):
         for func_num, func in enumerate(sub_sel_funcs):
-            for bal in bal_list:
+            for bal_idx, bal in enumerate(bal_list):
 
                 highest_metric_sum = 0
                 lowest_metric_sum = 1000
@@ -698,6 +702,8 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
                 hyperparam_sets = hyper_index_df[(hyper_index_df['sub_sel_func'] == func)]['hyperparam_set'].to_list()
 
                 for hyperparam_set in hyperparam_sets:
+                    bal_str = '' if bal == 0 else '_bal'
+
                     metric = np.zeros((num_of_trials, class_seq_len - 1), dtype=float)
 
                     filtered_df = df[(df['dataset_name'] == dataset_name) & (df['emulation'] == config['host']) &
@@ -723,12 +729,15 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
                     label = [int(filtered_df['num_iter'].tolist()[0])] if func == 'greedy' else [
                         int(filtered_df['num_gen'].tolist()[0])]
                     label += [filtered_df['mutation_rate'].tolist()[0]]
-                    legend_title = 'num_iter, ' if func == 'greedy' else 'num_gen, '
-                    legend_title += 'mut'
+                    legend_title = f"$\\texttt{{{func}{bal_str}()}}$ - ["
+                    legend_title += r'$N_{\text{iter}}$, ' if func == 'greedy' else r'$N_{\text{gen}}$, '
+                    legend_title += '$\mu$'
                     if func == 'evo':
                         label += [int(filtered_df['population_size'].tolist()[0])] + [
                             int(filtered_df['num_parents'].tolist()[0])]
-                        legend_title += ', pop_size, num_parents'
+                        legend_title += r'$, N_{\text{ch}}$, $N_{\text{par}}$'
+                    legend_title += ']'
+
                     label_str = str(label)
 
                     metric_sum = metric_mean.sum()
@@ -748,51 +757,66 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
 
                     if show_all_plots:
                         t = np.arange(2, class_seq_len + 1)
-                        ax[2 * func_num + bal, col].plot(t, metric_mean, label=hyperparam_set, lw=0.6)
-                        ax[2 * func_num + bal, col].fill_between(t, metric_mean - metric_std, metric_mean + metric_std,
+                        ax[len(bal_list) * func_num + bal_idx, col].plot(t, metric_mean, label=hyperparam_set, lw=0.6)
+                        ax[len(bal_list) * func_num + bal_idx, col].fill_between(t, metric_mean - metric_std, metric_mean + metric_std,
                                                                  lw=0.6, alpha=0.08)
 
                 if seq_type == 'low':
-                    bal_str = '' if bal == 0 else '_bal'
                     with open(os.path.join(config['artifacts_dir_path'], f'{dataset_name}_{func}{bal_str}_hyper.txt'),
                               'w') as f:
                         f.write(best_hyperparam[0])
 
                 if not show_all_plots:
                     t = np.arange(2, class_seq_len + 1)
-                    ax[2 * func_num + bal, col].plot(t, best_hyperparam_mean, label=str(best_hyperparam[1]), lw=0.8)
-                    ax[2 * func_num + bal, col].fill_between(t, best_hyperparam_mean - best_hyperparam_std,
+                    ax[len(bal_list) * func_num + bal_idx, col].plot(t, best_hyperparam_mean, label=str(best_hyperparam[1]), lw=0.8)
+                    ax[len(bal_list) * func_num + bal_idx, col].fill_between(t, best_hyperparam_mean - best_hyperparam_std,
                                                              best_hyperparam_mean + best_hyperparam_std, lw=0.8,
                                                              alpha=0.08)
 
-                    ax[2 * func_num + bal, col].plot(t, worst_hyperparam_mean, label=str(worst_hyperparam[1]), lw=0.8)
-                    ax[2 * func_num + bal, col].fill_between(t, worst_hyperparam_mean - worst_hyperparam_std,
+                    ax[len(bal_list) * func_num + bal_idx, col].plot(t, worst_hyperparam_mean, label=str(worst_hyperparam[1]), lw=0.8)
+                    ax[len(bal_list) * func_num + bal_idx, col].fill_between(t, worst_hyperparam_mean - worst_hyperparam_std,
                                                              worst_hyperparam_mean + worst_hyperparam_std, lw=0.8,
                                                              alpha=0.08)
 
-                    ax[2 * func_num + bal, col].legend(title=legend_title, fontsize=5, title_fontsize=5)
+                    ax[len(bal_list) * func_num + bal_idx, col].legend(title=legend_title, fontsize=5, title_fontsize=5)
 
-                ax[2 * func_num + bal, col].grid(True)
-                ax[2 * func_num + bal, col].set_xticks([i for i in range(2, class_seq_len + 1, int(class_seq_len / 5))])
+                ax[len(bal_list) * func_num + bal_idx, col].yaxis.set_minor_locator(AutoMinorLocator(2))
+                ax[len(bal_list) * func_num + bal_idx, col].grid(True, which='minor', alpha=0.3)
+                ax[len(bal_list) * func_num + bal_idx, col].grid(True, which='major')
+                ax[len(bal_list) * func_num + bal_idx, col].set_xticks([i for i in range(2, class_seq_len + 1, int(class_seq_len / 5))])
 
                 if dataset_name == 'EMNIST':
-                    ax[2 * func_num + bal, col].set_ylim([0, 1])
+                    ax[len(bal_list) * func_num + bal_idx, col].set_ylim([0, 1])
                 else:
-                    ax[2 * func_num + bal, col].set_ylim([0.55, 1])
+                    ax[len(bal_list) * func_num + bal_idx, col].set_ylim([0.55, 1])
 
                 if func_num == 0 and bal == 0:
                     if seq_type == 'low':
-                        ax[2 * func_num + bal, col].set_title('$\mathbf{q}_{\min} - A_{1}$ on train set')
+                        ax[len(bal_list) * func_num + bal_idx, col].set_title('$\mathbf{q}_{\min} - A_{1}$ on train set')
                     elif seq_type == 'high':
-                        ax[2 * func_num + bal, col].set_title('$\mathbf{q}_{\max} - A_{1}$ on train set')
+                        ax[len(bal_list) * func_num + bal_idx, col].set_title('$\mathbf{q}_{\max} - A_{1}$ on train set')
 
                 bal_str = '' if bal == 0 else '_bal'
                 if seq_type == 'low':
-                    ax[2 * func_num + bal, col].set_ylabel(f'{func}{bal_str}')
+                    ax[len(bal_list) * func_num + bal_idx, col].set_ylabel('$A_{1}$ on train set \n $\{\mathcal{B}_{t}\}_{i=1}^{t}$')
+
+                if len(bal_list) * func_num + bal_idx == 0:
+                    if seq_type == 'low':
+                        ax[len(bal_list) * func_num + bal_idx, col].set_title('$\mathbf{q}_{\min}$')
+                    elif seq_type == 'high':
+                        ax[len(bal_list) * func_num + bal_idx, col].set_title('$\mathbf{q}_{\max}$')
+
+
+                if len(bal_list) * func_num + bal_idx == len(sub_sel_funcs) * len(bal_list) - 1:
+                    ax[len(bal_list) * func_num + bal_idx, col].set_xlabel('Num of classes')
+                else:
+                    ax[len(bal_list) * func_num + bal_idx, col].set_xticklabels([])
+
 
                 # print(f'{dataset_name}, {func}{bal_str}, seq={seq_type}, best_hyperparam={best_hyperparam[1]}, worst_hyperparam={worst_hyperparam[1]}')
 
-            fig.suptitle(f'{dataset_name}, ram_buf_size={64}, eeprom_buf_size={128}', y=0.92)
+            fig.suptitle(f'{dataset_name}', y=0.96)
+            fig.subplots_adjust(bottom=0.15)
 
             if save_fig:
                 plt.savefig(os.path.join(config['plots_dir_path'],
@@ -818,19 +842,21 @@ if __name__ == '__main__':
         'legend.fontsize': 8,
         'legend.title_fontsize': 8,
         'text.usetex': True,
+        'text.latex.preamble': r'\usepackage{amsmath}'
     }
     plt.rcParams.update(rc_params)
 
     # Analyse hyperparameter grid search results -----------------------------------------------------------------------
     sub_sel_funcs = ['greedy', 'evo']
-    bal_list = [0, 1]
+    bal_list = [1]
     seq_types = ['low', 'high']
+    textwidth = 395.8225
     num_of_trials = 20
-    plot_hyperparameter_sweep(config, 'MNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials,
+    plot_hyperparameter_sweep(config, 'MNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials, textwidth,
                               show_all_plots=False, save_fig=True)
-    plot_hyperparameter_sweep(config, 'FashionMNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials,
+    plot_hyperparameter_sweep(config, 'FashionMNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials, textwidth,
                               show_all_plots=False, save_fig=True)
-    plot_hyperparameter_sweep(config, 'EMNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials,
+    plot_hyperparameter_sweep(config, 'EMNIST', sub_sel_funcs, bal_list, seq_types, num_of_trials, textwidth,
                               show_all_plots=False, save_fig=True)
     # ------------------------------------------------------------------------------------------------------------------
 
@@ -843,7 +869,6 @@ if __name__ == '__main__':
     color_dict = {buffer_size: color_list[i] for i, buffer_size in enumerate(buffer_sizes)}
 
     config['host'] = True
-    textwidth = 395.8225
     sub_sel_funcs = ['rand_bal', 'greedy_bal', 'evo_bal']
 
     # Get MNIST and FashionMNIST plots ---------------------------------------------------------------------------------
@@ -884,5 +909,6 @@ if __name__ == '__main__':
     seq_types = ['high', 'low'] # Reverse seq order for table
     class_incr_acc_table(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
 
-    plot_acc_time_pareto_front(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
+    plot_acc_time_pareto_front(config, 'EMNIST', ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
+                               seq_types, buffer_sizes, num_of_trials,
                                textwidth, color_dict, save_fig=True)
