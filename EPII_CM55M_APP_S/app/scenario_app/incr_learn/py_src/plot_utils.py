@@ -277,8 +277,12 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
                         metric_std = data[row, buffer_size_pair_num, col, func_num, 1, :, -1]
 
                         color = 'b'
-                        if func == 'rand_bal':
+                        if func == 'rand':
                             linestyle = '-'
+                            hatch = '/'
+                            label = f'({ram_buffer_size}, {eeprom_buffer_size})'
+                        elif func == 'rand_bal':
+                            linestyle = '-.'
                             hatch = '/'
                             label = f'({ram_buffer_size}, {eeprom_buffer_size})'
                         elif func == 'greedy_bal':
@@ -303,14 +307,14 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
 
                         if eval_metric == 'acc_test_set_union':
                             if dataset_name == 'FashionMNIST' or dataset_name == 'MNIST':
-                                ax[row, 2 * i + col].set_ylim([0.55, 1.0])
-                            else:
                                 ax[row, 2 * i + col].set_ylim([0.3, 1.0])
+                            else:
+                                ax[row, 2 * i + col].set_ylim([0.0, 1.0])
                         elif eval_metric == 'acc_train_set_union':
                             if dataset_name == 'FashionMNIST' or dataset_name == 'MNIST':
-                                ax[row, 2 * i + col].set_ylim([0.55, 1.0])
-                            else:
                                 ax[row, 2 * i + col].set_ylim([0.3, 1.0])
+                            else:
+                                ax[row, 2 * i + col].set_ylim([0.0, 1.0])
                         elif eval_metric == 'acc_global':
                             ax[row, 2 * i + col].set_ylim([0, 1.0])
 
@@ -368,6 +372,15 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
         ax[0, 0].legend(lines, buffer_sizes, title='Volatile and non-volatile mem.\nbuffer sizes (kB):',
                         loc='upper center', ncol=2, fancybox=False, shadow=False)
 
+        lines = []
+        lines.append(ax[1, 0].plot([], [], color='black', linestyle='-')[0])
+        lines.append(ax[1, 0].plot([], [], color='black', linestyle='-.')[0])
+        lines.append(ax[1, 0].plot([], [], color='black', linestyle='--')[0])
+        lines.append(ax[1, 0].plot([], [], color='black', linestyle=':')[0])
+        formatted_func_names = [f"$\\texttt{{{func_name}()}}$" for func_name in sub_sel_funcs]
+
+        ax[1, 0].legend(lines, formatted_func_names, title='Sub. sel. functions:',
+                        loc='upper center', ncol=2, fancybox=False, shadow=False)
         # ax[0, 0].legend(title='Volatile and non-volatile mem.\nbuffer sizes (kB):', handles=handles, labels=labels,
         #            loc='upper center', ncol=2, fancybox=False, shadow=False)
 
@@ -878,7 +891,7 @@ if __name__ == '__main__':
                     (64, 128),
                     # (128, 256),
                     (256, 512)]
-    plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
+    plot_class_incr_learning(config, dataset_names, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'], seq_types, buffer_sizes, num_of_trials,
                              textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
     seq_types = ['high', 'low'] # Reverse seq order for table
@@ -903,7 +916,7 @@ if __name__ == '__main__':
                     #(64, 128),
                     (128, 256),
                     (256, 512)]
-    plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
+    plot_class_incr_learning(config, dataset_names, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'], seq_types, buffer_sizes, num_of_trials,
                              textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
     seq_types = ['high', 'low'] # Reverse seq order for table
