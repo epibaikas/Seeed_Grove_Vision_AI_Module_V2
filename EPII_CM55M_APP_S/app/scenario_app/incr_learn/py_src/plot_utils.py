@@ -690,7 +690,7 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
     ram_buffer_size, eeprom_buffer_size = 64, 128
 
     width_in, _ = set_size(width=textwidth, subplots=(len(sub_sel_funcs) * len(bal_list), len(seq_types)))
-    height_in = 2.4
+    height_in = 2
 
     df = pd.read_csv(os.path.join(config['log_dir_path'], config['file_index']))
 
@@ -801,7 +801,8 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
                 if dataset_name == 'EMNIST':
                     ax[len(bal_list) * func_num + bal_idx, col].set_ylim([0, 1])
                 else:
-                    ax[len(bal_list) * func_num + bal_idx, col].set_ylim([0.55, 1])
+                    ax[len(bal_list) * func_num + bal_idx, col].set_ylim([0.6, 1])
+                    ax[len(bal_list) * func_num + bal_idx, col].set_yticks([0.6, 0.8, 1])
 
                 if func_num == 0 and bal == 0:
                     if seq_type == 'low':
@@ -811,7 +812,7 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
 
                 bal_str = '' if bal == 0 else '_bal'
                 if seq_type == 'low':
-                    ax[len(bal_list) * func_num + bal_idx, col].set_ylabel('$A_{1}$ on train set \n $\{\mathcal{B}_{t}\}_{i=1}^{t}$')
+                    ax[len(bal_list) * func_num + bal_idx, col].set_ylabel('$A_{1}$ on train \n set $\{\mathcal{B}_{t}\}_{i=1}^{t}$')
 
                 if len(bal_list) * func_num + bal_idx == 0:
                     if seq_type == 'low':
@@ -821,7 +822,8 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
 
 
                 if len(bal_list) * func_num + bal_idx == len(sub_sel_funcs) * len(bal_list) - 1:
-                    ax[len(bal_list) * func_num + bal_idx, col].set_xlabel('Num of classes')
+                    if dataset_name == 'EMNIST':
+                        ax[len(bal_list) * func_num + bal_idx, col].set_xlabel('Num of classes')
                 else:
                     ax[len(bal_list) * func_num + bal_idx, col].set_xticklabels([])
 
@@ -833,7 +835,8 @@ def plot_hyperparameter_sweep(config, dataset_name, sub_sel_funcs, bal_list, seq
 
             if save_fig:
                 plt.savefig(os.path.join(config['plots_dir_path'],
-                                         f'{dataset_name}_grid_search_all_plots={str(show_all_plots).lower()}.pdf'))
+                            f'{dataset_name}_grid_search_all_plots={str(show_all_plots).lower()}.pdf'),
+                            bbox_inches='tight')
 
 if __name__ == '__main__':
     # Get configuration parameters
