@@ -104,14 +104,13 @@ For example, to run greedy_bal() subset selection on FashionMNIST with a 32 kB R
 python scripts/run_sub_selection FashionMNIST greedy 1 32 64 --hyperparam greedy_hyper02
 ```
 
-
 To run on the Seeed board instead of the host platform, add the `--target_dev` flag at the end. 
 Ensure that the device is connected to the system and update its serial port in `config/config_global.ini`
 
 
 The codenames for the best hyperparameter sets determined for every dataset and function can be found in the following table. 
 The exact hyperparameters corresponding to each codename can be found in `artifacts/hyper_index.csv`
-|---------------|---------------|--------------------|
+
 | Dataset       | Function      | Hyperparameter set |
 | ------------- | ------------- | ------------------ |
 | MNIST         | greedy_bal()  | greedy_hyper02     |
