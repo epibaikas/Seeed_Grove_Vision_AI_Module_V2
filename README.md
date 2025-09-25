@@ -112,13 +112,10 @@ The codenames for the best hyperparameter sets determined for every dataset and 
 The exact hyperparameters corresponding to each codename can be found in `artifacts/hyper_index.csv`
 
 | Dataset       | Function      | Hyperparameter set |
-| ------------- | ------------- | ------------------ |
+|:--------------|:--------------|:------------------ |
 | MNIST         | greedy_bal()  | greedy_hyper02     |
 |               | evo_bal()     | evo_hyper29        |
-|---------------|---------------|--------------------|
 | FashionMNIST  | greedy_bal()  | greedy_hyper02     |
 |               | evo_bal()     | evo_hyper29        |
-|---------------|---------------|--------------------|
 | EMNIST        | greedy_bal()  | greedy_hyper01     |
 |               | evo_bal()     | evo_hyper05        |
-|---------------|---------------|--------------------|
