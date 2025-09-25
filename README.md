@@ -75,23 +75,51 @@ cd EPII_CM55M_APP_S/app/scenario_app/incr_learn/
 
 To reproduce experimental results, follow the steps described below in the exact order:
 
-(1) Run the greedy algorithm to find the "low" and "high" accuracy sequences (please note that sequence finding for EMNIST might take several hours):
+(1) Run 6-fold cross validation to determine the number of Nearest Neighbors for each dataset:
+```
+python py_src/k_fold_cross_validation.py MNIST
+python py_src/k_fold_cross_validation.py FashionMNIST
+python py_src/k_fold_cross_validation.py EMNIST
+```
+
+(2) Run the greedy algorithm to find the "low" and "high" accuracy sequences (please note that sequence finding for EMNIST might take several hours):
 ```
 python py_src/greedy_sequence_finder.py MNIST
 python py_src/greedy_sequence_finder.py FashionMNIST
 python py_src/greedy_sequence_finder.py EMNIST
 ```
 
-(2) Run incremental learning experiments for a specific dataset, subset selection function, balancing condition, ram and eeprom buffer sizes:
+(3) Generate hyperparameter index file `artifacts/hyper_index.csv` 
 ```
-python scripts/run_sub_selection [dataset] [sub_sel_func] [bal] [ram_buf_size] [eeprom_buf_size]
+python scripts/gen_hyperparameter_files.py
 ```
 
-For example, to run greedy balanced subset selection on FashionMNIST with a 32 kB RAM buffer size and a 64 kB EEPROM buffer size, use the following arguments:
+(4) Run incremental learning experiments for a specific dataset, subset selection function, balancing condition, ram and eeprom buffer sizes:
 ```
-python scripts/run_sub_selection FashionMNIST greedy 1 32 64
+python scripts/run_sub_selection [dataset] [sub_sel_func] [bal] [ram_buf_size] [eeprom_buf_size] --hyperparam [hyperparam_set]
+```
+
+For example, to run greedy_bal() subset selection on FashionMNIST with a 32 kB RAM buffer size and a 64 kB EEPROM buffer size, use the following arguments:
+```
+python scripts/run_sub_selection FashionMNIST greedy 1 32 64 --hyperparam greedy_hyper02
 ```
 
 
 To run on the Seeed board instead of the host platform, add the `--target_dev` flag at the end. 
 Ensure that the device is connected to the system and update its serial port in `config/config_global.ini`
+
+
+The codenames for the best hyperparameter sets determined for every dataset and function can be found in the following table. 
+The exact hyperparameters corresponding to each codename can be found in `artifacts/hyper_index.csv`
+|---------------|---------------|--------------------|
+| Dataset       | Function      | Hyperparameter set |
+| ------------- | ------------- | ------------------ |
+| MNIST         | greedy_bal()  | greedy_hyper02     |
+|               | evo_bal()     | evo_hyper29        |
+|---------------|---------------|--------------------|
+| FashionMNIST  | greedy_bal()  | greedy_hyper02     |
+|               | evo_bal()     | evo_hyper29        |
+|---------------|---------------|--------------------|
+| EMNIST        | greedy_bal()  | greedy_hyper01     |
+|               | evo_bal()     | evo_hyper05        |
+|---------------|---------------|--------------------|
