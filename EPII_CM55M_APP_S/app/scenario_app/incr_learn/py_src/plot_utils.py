@@ -3,6 +3,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.ticker as ticker
+import matplotlib.patches as patches
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.colors as mcolors
 import os
@@ -260,7 +261,10 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
     width_in, _ = set_size(width=textwidth, subplots=(len(eval_metrics), len(seq_types) * len(dataset_names)))
 
     fig, ax = plt.subplots(nrows=len(eval_metrics), ncols=len(seq_types) * len(dataset_names),
-                           figsize=(width_in, 2 * 2.0))
+                           figsize=(width_in, 2 * 1.95))
+
+    if len(dataset_names) == 2:
+        fig.subplots_adjust(top=0.80, left=0.08, right=1.0, wspace=0.08)
 
     for i, dataset_name in enumerate(dataset_names):
         class_sequences = np.load(os.path.join(config['artifacts_dir_path'], dataset_name + '_class_sequences.npy'))
@@ -349,16 +353,10 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
         ax[1, 2 * i + 1].set_xlabel('Num of classes')
 
         dataset_names_str += dataset_name + '_'
-    # handles, labels = plt.gca().get_legend_handles_labels()
 
     if len(dataset_names) == 2:
-        plt.figtext(0.30, 0.96, dataset_names[0], va="center", ha="center")
-        plt.figtext(0.75, 0.96, dataset_names[1], va="center", ha="center")
-    #     fig.legend(title='Volatile and non-volatile mem. buffer sizes (kB):', handles=handles, labels=labels,
-    #                loc='upper center', bbox_to_anchor=(0.5, 0.03),
-    #                ncol=4, fancybox=False, shadow=False)
-    else:
-        plt.figtext(0.53, 0.96, dataset_names[0], va="center", ha="center")
+        fig.text(0.30, 0.825, dataset_names[0], va="center", ha="center")
+        fig.text(0.77, 0.825, dataset_names[1], va="center", ha="center")
 
         buffer_sizes = [(32, 64),
                         (128, 256),
@@ -369,8 +367,9 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
         # Plot dummy lines
         lines = [ax[0, 0].plot([], [], color=color)[0] for color in colors]
 
-        ax[0, 0].legend(lines, buffer_sizes, title='Volatile and non-volatile mem.\nbuffer sizes (kB):',
-                        loc='upper center', ncol=2, fancybox=False, shadow=False)
+        fig.legend(lines, buffer_sizes, title='Volatile and non-vol. mem. buffer sizes (kB):',
+                   loc='lower left', bbox_to_anchor=(0.07, 0.84),  ncol=2,
+                   frameon=False, fancybox=False, shadow=False)
 
         lines = []
         lines.append(ax[1, 0].plot([], [], color='black', linestyle='-')[0])
@@ -379,16 +378,28 @@ def plot_class_incr_learning(config, dataset_names, sub_sel_funcs, seq_types, bu
         lines.append(ax[1, 0].plot([], [], color='black', linestyle=':')[0])
         formatted_func_names = [f"$\\texttt{{{func_name}()}}$" for func_name in sub_sel_funcs]
 
-        ax[1, 0].legend(lines, formatted_func_names, title='Sub. sel. functions:',
-                        loc='upper center', ncol=2, fancybox=False, shadow=False)
-        # ax[0, 0].legend(title='Volatile and non-volatile mem.\nbuffer sizes (kB):', handles=handles, labels=labels,
-        #            loc='upper center', ncol=2, fancybox=False, shadow=False)
+        fig.legend(lines, formatted_func_names, title='Sub. sel. functions:',
+                        loc='lower left', bbox_to_anchor=(0.55, 0.845), ncol=2,
+                        frameon=False, fancybox=False, shadow=False)
+
+        rect = patches.Rectangle(
+            (0.07, 0.85),  # bottom-left corner (x, y)
+            0.90, 0.14,  # width, height
+            linewidth=1,
+            edgecolor='lightgray',
+            facecolor='none',  # transparent inside
+            transform=fig.transFigure  # use figure coordinates
+        )
+        fig.patches.append(rect)
+
+    else:
+        plt.figtext(0.53, 0.96, dataset_names[0], va="center", ha="center")
+        plt.tight_layout()
 
     if save_fig:
-        plt.tight_layout()
         plt.savefig(os.path.join(config['plots_dir_path'],
                                  f'{dataset_names_str}class_incr_learn_emulation={str(config["host"]).lower()}.pdf'),
-                    bbox_inches='tight', pad_inches=0.0)
+                                bbox_inches='tight', pad_inches=0.0)
     else:
         plt.show()
 
@@ -897,19 +908,19 @@ if __name__ == '__main__':
     plot_class_incr_learning(config, dataset_names, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'], seq_types, buffer_sizes, num_of_trials,
                              textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
-    seq_types = ['high', 'low'] # Reverse seq order for table
-    buffer_sizes = [(32, 64),
-                    (64, 128),
-                    (128, 256),
-                    (256, 512)]
-    for dataset_name in dataset_names:
-        class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
-        plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
-                                textwidth, color_dict, save_fig=True)
-        plot_acc_time_pareto_front(config, dataset_name, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
-                                   seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=True)
-
-    timing_measurements_table(config, 'MNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    # seq_types = ['high', 'low'] # Reverse seq order for table
+    # buffer_sizes = [(32, 64),
+    #                 (64, 128),
+    #                 (128, 256),
+    #                 (256, 512)]
+    # for dataset_name in dataset_names:
+    #     class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    #     plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
+    #                             textwidth, color_dict, save_fig=True)
+    #     plot_acc_time_pareto_front(config, dataset_name, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
+    #                                seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=True)
+    #
+    # timing_measurements_table(config, 'MNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
 
     # Get EMNIST plots -------------------------------------------------------------------------------------------------
     print('Creating EMNIST plots and tables...')
@@ -922,9 +933,9 @@ if __name__ == '__main__':
     plot_class_incr_learning(config, dataset_names, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'], seq_types, buffer_sizes, num_of_trials,
                              textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
-    seq_types = ['high', 'low'] # Reverse seq order for table
-    class_incr_acc_table(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
-
-    plot_acc_time_pareto_front(config, 'EMNIST', ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
-                               seq_types, buffer_sizes, num_of_trials,
-                               textwidth, color_dict, save_fig=True)
+    # seq_types = ['high', 'low'] # Reverse seq order for table
+    # class_incr_acc_table(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    #
+    # plot_acc_time_pareto_front(config, 'EMNIST', ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
+    #                            seq_types, buffer_sizes, num_of_trials,
+    #                            textwidth, color_dict, save_fig=True)
