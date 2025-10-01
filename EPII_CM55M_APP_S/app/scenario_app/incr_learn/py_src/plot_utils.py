@@ -908,19 +908,19 @@ if __name__ == '__main__':
     plot_class_incr_learning(config, dataset_names, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'], seq_types, buffer_sizes, num_of_trials,
                              textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
-    # seq_types = ['high', 'low'] # Reverse seq order for table
-    # buffer_sizes = [(32, 64),
-    #                 (64, 128),
-    #                 (128, 256),
-    #                 (256, 512)]
-    # for dataset_name in dataset_names:
-    #     class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
-    #     plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
-    #                             textwidth, color_dict, save_fig=True)
-    #     plot_acc_time_pareto_front(config, dataset_name, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
-    #                                seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=True)
-    #
-    # timing_measurements_table(config, 'MNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+    seq_types = ['high', 'low'] # Reverse seq order for table
+    buffer_sizes = [(32, 64),
+                    (64, 128),
+                    (128, 256),
+                    (256, 512)]
+    for dataset_name in dataset_names:
+        class_incr_acc_table(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+        plot_timing_measurements(config, dataset_name, sub_sel_funcs, seq_types, buffer_sizes, num_of_trials,
+                                textwidth, color_dict, save_fig=True)
+        plot_acc_time_pareto_front(config, dataset_name, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
+                                   seq_types, buffer_sizes, num_of_trials, textwidth, color_dict, save_fig=True)
+
+    timing_measurements_table(config, 'MNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
 
     # Get EMNIST plots -------------------------------------------------------------------------------------------------
     print('Creating EMNIST plots and tables...')
@@ -933,9 +933,9 @@ if __name__ == '__main__':
     plot_class_incr_learning(config, dataset_names, ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'], seq_types, buffer_sizes, num_of_trials,
                              textwidth=textwidth, color_dict=color_dict, save_fig=True)
 
-    # seq_types = ['high', 'low'] # Reverse seq order for table
-    # class_incr_acc_table(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
-    #
-    # plot_acc_time_pareto_front(config, 'EMNIST', ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
-    #                            seq_types, buffer_sizes, num_of_trials,
-    #                            textwidth, color_dict, save_fig=True)
+    seq_types = ['high', 'low'] # Reverse seq order for table
+    class_incr_acc_table(config, 'EMNIST', sub_sel_funcs, seq_types, buffer_sizes, num_of_trials)
+
+    plot_acc_time_pareto_front(config, 'EMNIST', ['rand', 'rand_bal', 'greedy_bal', 'evo_bal'],
+                               seq_types, buffer_sizes, num_of_trials,
+                               textwidth, color_dict, save_fig=True)
