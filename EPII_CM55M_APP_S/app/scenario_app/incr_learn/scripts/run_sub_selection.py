@@ -58,9 +58,9 @@ if __name__ == '__main__':
 
     if host:
         if dataset_name == 'EMNIST':
-            MAX_WORKERS = 10
+            MAX_WORKERS = 4
         else:
-            MAX_WORKERS = 12
+            MAX_WORKERS = 6
 
         scripts_with_args = []
         start_trial = 1
