@@ -120,3 +120,10 @@ The exact hyperparameters corresponding to each codename can be found in `artifa
 |               | evo_bal()     | evo_hyper29        |
 | EMNIST        | greedy_bal()  | greedy_hyper01     |
 |               | evo_bal()     | evo_hyper05        |
+
+## Plot results
+To plot experimental results run:
+```
+python py_src/plot_utils.py
+```
+Please not that the plotting script works after the experimental results for all sub. sel. functions and datasets have been captured.
