@@ -14,6 +14,7 @@ The original structure of the `incr_learn` app folder before generating experime
 .
 ├── c_src       # C source code
 ├── config      # Experiment configuration files
+├── doc		# Documentation files
 ├── inc         # C header files
 ├── py_src      # Python source files
 ├── scripts     # Bash scripts for generating experimental results
