@@ -97,12 +97,12 @@ python scripts/gen_hyperparameter_files.py
 
 (4) Run incremental learning experiments for a specific dataset, subset selection function, balancing condition, ram and eeprom buffer sizes:
 ```
-python scripts/run_sub_selection [dataset] [sub_sel_func] [bal] [ram_buf_size] [eeprom_buf_size] --hyperparam [hyperparam_set]
+python scripts/run_sub_selection.py [dataset] [sub_sel_func] [bal] [ram_buf_size] [eeprom_buf_size] --hyperparam [hyperparam_set]
 ```
 
 For example, to run greedy_bal() subset selection on FashionMNIST with a 32 kB RAM buffer size and a 64 kB EEPROM buffer size, use the following arguments:
 ```
-python scripts/run_sub_selection FashionMNIST greedy 1 32 64 --hyperparam greedy_hyper02
+python scripts/run_sub_selection.py FashionMNIST greedy 1 32 64 --hyperparam greedy_hyper02
 ```
 
 To run on the Seeed board instead of the host platform, add the `--target_dev` flag at the end. 
