@@ -28,6 +28,7 @@ After running the scripts, the folder structure changes to:
 ├── build       # Compiled C code for Linux / MacOS host platform
 ├── c_src       # C source code
 ├── config      # Experiment configuration files
+├── doc		    # Documentation files
 ├── datasets    # Dataset files downloaded by PyTorch library
 ├── inc         # C header files
 ├── log         # Experiment log files in xml and txt format
