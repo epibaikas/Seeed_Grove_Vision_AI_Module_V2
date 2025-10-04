@@ -38,6 +38,10 @@ After running the scripts, the folder structure changes to:
 └── tests       # Unit tests
 ```
 
+Please note that in the version of the repository provided as supplementary material for the ACM TECS paper submission, the directories `artifacts`, `log`, and `results` containing the raw data for the experimental results presented in the manuscript are already present. Generated figures created by processing these data are also included in directory `plots`.
+
+To regenerate the figures directly from the raw data, setup the conda environment using the instructions provided in the following section and then skip directly to the [plotting instructions](#plot-results) section.
+
 ## Setup
 ### Setup the conda environment
 Clone the repository and setup the conda environment that is necessary to run the experiments:
