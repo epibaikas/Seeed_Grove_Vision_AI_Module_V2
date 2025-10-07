@@ -8,6 +8,13 @@ EPII_CM55M_APP_S/app/scenario_app/incr_learn/
 
 The C implmentation was initially developed for the Seeed Grove Vision AI Module V2 board, but has also been ported to Linux / MacOS host platforms. A dedicated makefile placed inside the `incr_learn` folder can be used to build the code for host platforms.
 
+## Clone repository
+
+To clone the `incr_learn` branch of the repository run:
+```
+git clone -b incr_learn https://github.com/epibaikas/Seeed_Grove_Vision_AI_Module_V2.git
+```
+
 ## Project folder structure
 The original structure of the `incr_learn` app folder before generating experimental results is:
 ```
