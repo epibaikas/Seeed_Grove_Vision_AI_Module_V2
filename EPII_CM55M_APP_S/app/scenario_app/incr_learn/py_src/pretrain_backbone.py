@@ -13,6 +13,7 @@ import wandb
 from util_functions import *
 from backbone_model.model import Model
 from dataloader_utils import *
+from scheduler import CosineAnnealingWarmupRestarts
 
 def validation(model, val_loader, criterion, device):
     val_loss_criterion = 0.0
@@ -140,6 +141,10 @@ if __name__ == '__main__':
 
     trainset, train_loader, val_loader = get_base_dataloader(config, dataloader_generator)
 
+    scheduler = CosineAnnealingWarmupRestarts(optimizer, first_cycle_steps=config['max_train_iter']*len(train_loader), cycle_mult=1.0, 
+                                            max_lr=config['learning_rate'], min_lr=config['learning_rate']*config['scheduler_min_lr_scaler'], 
+                                            warmup_steps=config['scheduler_warmup_step'], gamma=0.0)
+
     # Login to wandb
     os.environ["WANDB_MODE"] = 'offline'
     run = wandb.init(
@@ -195,6 +200,8 @@ if __name__ == '__main__':
             _, predicted = torch.max(output, 1)
             num_correct += (predicted == train_labels).sum().item()
             num_total += train_labels.size(0)
+
+            scheduler.step()
 
         val_loss_criterion, val_top1_acc = validation(model, val_loader, criterion, device)
 
