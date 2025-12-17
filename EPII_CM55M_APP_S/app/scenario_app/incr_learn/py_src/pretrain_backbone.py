@@ -126,10 +126,10 @@ if __name__ == '__main__':
     else:
         config['augments'] = None
 
-    if not os.path.exists(config['results_dir_path']):
-        os.mkdir(config['results_dir_path'])
+    if not os.path.exists(config['artifacts_dir_path']):
+        os.mkdir(config['artifacts_dir_path'])
 
-    checkpoint_path = os.path.join(config['results_dir_path'], f'{config["block_architecture"]}_{config["dataset"]}.pth')
+    checkpoint_path = os.path.join(config['artifacts_dir_path'], f'{config["block_architecture"]}_{config["dataset"]}.pth')
 
     dataloader_generator = torch.Generator()
     if os.path.exists(checkpoint_path):
