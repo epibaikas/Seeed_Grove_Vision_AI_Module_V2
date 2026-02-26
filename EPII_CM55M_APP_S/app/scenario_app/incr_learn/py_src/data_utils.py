@@ -1,8 +1,30 @@
 import numpy as np
+import os
+import pickle
 import torch
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+from tqdm import tqdm
 import argparse
+
+
+class FeatureDataset:
+    """Lightweight dataset wrapper for feature vectors extracted by 
+    pre-trained neural network models. Mimics the torchvision dataset 
+    interface (.data, .targets, .classes) to preserve compatibility with
+    get_class_example_indices() and get_random_balanced_subset_indices().
+    """
+    def __init__(self, features, labels, classes):
+        self.data = features                        # np.ndarray (N, D)
+        self.targets = torch.tensor(labels)         # torch.Tensor (N,)
+        self.classes = classes                      # list of str
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index], self.targets[index]
+
 
 def load_dataset(dataset_name, root_dir, device):
     # Get the dataset
@@ -15,13 +37,32 @@ def load_dataset(dataset_name, root_dir, device):
     elif dataset_name == 'EMNIST':
         train_set = datasets.EMNIST(root=root_dir, split='balanced', download=True, transform=ToTensor(), train=True)
         test_set = datasets.EMNIST(root=root_dir, split='balanced', download=True, transform=ToTensor(), train=False)
+    elif dataset_name.endswith('_feat'):
+        # Load pre-extracted features from a pickle file
+        # Expected filename: {dataset_name}.pkl inside root_dir (artifacts dir)
+        feat_path = os.path.join(root_dir, f'{dataset_name}.pkl')
+        if not os.path.exists(feat_path):
+            raise FileNotFoundError(
+                f'Pre-extracted features not found at {feat_path}. '
+                f'Run feature extraction first (see extract_features()).'
+            )
+
+        with open(feat_path, 'rb') as f:
+            artifact = pickle.load(f)
+
+        train_set = FeatureDataset(artifact['train_features'],
+                                   artifact['train_labels'],
+                                   artifact['classes'])
+        test_set = FeatureDataset(artifact['test_features'],
+                                  artifact['test_labels'],
+                                  artifact['classes'])
     else:
         raise argparse.ArgumentTypeError('Unknown dataset name')
 
-    X_train = train_set.data.type(torch.int32)
+    X_train = torch.as_tensor(train_set.data, dtype=torch.int32).to(device)
     y_train = train_set.targets.type(torch.int8).to(device)
 
-    X_test = test_set.data.type(torch.int32)
+    X_test = torch.as_tensor(test_set.data, dtype=torch.int32).to(device)
     y_test = test_set.targets.type(torch.int8).to(device)
 
     # print('Dataset:', dataset_name)
@@ -74,3 +115,18 @@ def get_class_example_indices(dataset, class_num):
     class_idxs = torch.nonzero((dataset.targets == class_num))
     class_idxs = torch.squeeze(class_idxs).numpy().tolist()
     return class_idxs
+
+def extract_features(model, dataloader, device):
+    """Run the backbone on a dataloader and return (features, labels) as numpy arrays."""
+    all_features = []
+    all_labels = []
+
+    model.eval()
+    with torch.no_grad():
+        for batch in tqdm(dataloader, total=len(dataloader), desc='Extracting features'):
+            data, labels = [_.to(device, non_blocking=True) for _ in batch]
+            _ = model(data)
+            all_features.append(model.proto.cpu().numpy())
+            all_labels.append(labels.cpu().numpy())
+
+    return np.concatenate(all_features, axis=0), np.concatenate(all_labels, axis=0)
