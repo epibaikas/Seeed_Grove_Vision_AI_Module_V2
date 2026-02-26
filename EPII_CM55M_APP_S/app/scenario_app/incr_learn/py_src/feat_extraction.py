@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     device = 'cpu'
     dataset_name = f'{config["block_architecture"]}_{config["dataset"]}_feat'
-    feat_path = os.path.join(config['artifacts_dir_path'], f'{dataset_name}.pkl')
+    feat_path = os.path.join(config['datasets_dir_path'], f'{dataset_name}.pkl')
 
     if not os.path.exists(feat_path):
         # ---- Feature extraction (one-time) ----
@@ -41,7 +41,7 @@ if __name__ == '__main__':
             f'{config["block_architecture"]}_{config["dataset"]}.pth'
         )
         if os.path.exists(checkpoint_path):
-            checkpoint = torch.load(checkpoint_path, map_location=device)
+            checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
             model.load_state_dict(checkpoint['model_state_dict'])
         else:
             raise RuntimeError('Trained model not found!')
@@ -80,7 +80,7 @@ if __name__ == '__main__':
         test_features  = ((test_features  - feat_min) / scale * 255).clip(0, 255).round().astype(np.uint8)
 
         # Save to pickle in the format load_dataset() expects
-        os.makedirs(config['artifacts_dir_path'], exist_ok=True)
+        os.makedirs(config['datasets_dir_path'], exist_ok=True)
         artifact = {
             'train_features': train_features,
             'train_labels': train_labels,
@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
     # ---- Load extracted features via the standard interface ----
     train_set, test_set, X_train, y_train, X_test, y_test = load_dataset(
-        dataset_name, config['artifacts_dir_path'], device
+        dataset_name, config['datasets_dir_path'], device
     )
 
     print(f'X_train: {X_train.shape}, X_test: {X_test.shape}')
