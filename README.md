@@ -19,31 +19,33 @@ git clone -b incr_learn https://github.com/epibaikas/Seeed_Grove_Vision_AI_Modul
 The original structure of the `incr_learn` app folder before generating experimental results is:
 ```
 .
-├── c_src       # C source code
-├── config      # Experiment configuration files
-├── doc		    # Documentation files
-├── inc         # C header files
-├── py_src      # Python source files
-├── scripts     # Bash scripts for generating experimental results
-└── tests       # Unit tests
+├── c_src           # C source code
+├── config          # Experiment configuration files
+├── doc		        # Documentation files
+├── fscil_splits    # Text files with predefined data splits for Few-Shot Class Incremental Learning sessions
+├── inc             # C header files
+├── py_src          # Python source files
+├── scripts         # Bash scripts for generating experimental results
+└── tests           # Unit tests
 ```
 
 After running the scripts, the folder structure changes to: 
 ```
 .
-├── artifacts   # Results from intermediate computations
-├── build       # Compiled C code for Linux / MacOS host platform
-├── c_src       # C source code
-├── config      # Experiment configuration files
-├── doc		    # Documentation files
-├── datasets    # Dataset files downloaded by PyTorch library
-├── inc         # C header files
-├── log         # Experiment log files in xml and txt format
-├── plots       # Plot figures
-├── py_src      # Python source files
-├── results     # Experimental results
-├── scripts     # Bash scripts for generating experimental results
-└── tests       # Unit tests
+├── artifacts       # Results from intermediate computations
+├── build           # Compiled C code for Linux / MacOS host platform
+├── c_src           # C source code
+├── config          # Experiment configuration files
+├── doc		        # Documentation files
+├── datasets        # Dataset files downloaded by PyTorch library
+├── fscil_splits    # Text files with predefined data splits for Few-Shot Class Incremental Learning sessions
+├── inc             # C header files
+├── log             # Experiment log files in xml and txt format
+├── plots           # Plot figures
+├── py_src          # Python source files
+├── results         # Experimental results
+├── scripts         # Bash scripts for generating experimental results
+└── tests           # Unit tests
 ```
 
 Please note that in the version of the repository provided as supplementary material for the ACM TECS paper submission, the directories `artifacts`, `log`, and `results` containing the raw data for the experimental results presented in the manuscript are already present. Generated figures created by processing these data are also included in directory `plots`.
